@@ -15,11 +15,13 @@ Track working time in a web app and a mobile app that stay in sync, replacing th
 
 ## Next steps
 
-1. Analyse the current Excel workflow → input for the data model and screens
-2. Clickable UI prototype
-3. GitHub remote, protect `main`
-4. Complete `CLAUDE.md`, agent definitions, `docs/data-model.md`
-5. First feature on a branch, ending in a PR
+1. ~~Requirements from the current Google Sheets workflow~~ → [requirements.md](requirements.md)
+2. ~~GitHub remote, rebase merge only~~
+3. Clickable UI prototype (period overview, add entry, settings)
+4. Gherkin specs for the Must stories
+5. Scaffold the web app (Vite, React, TypeScript, Vitest, Cucumber.js); complete `CLAUDE.md`, agent definitions,
+   `docs/data-model.md`
+6. First story through the full spec → plan → TDD flow, ending in a PR
 
 ## Decisions
 
@@ -35,3 +37,7 @@ Track working time in a web app and a mobile app that stay in sync, replacing th
 | 8 | Conventional Commits | Consistent, scannable history; enables changelog tooling later |
 | 9 | Every commit builds and passes all tests | `git bisect` and reverts stay reliable |
 | 10 | Rebase merge, no squash | Linear history that keeps each meaningful commit |
+| 11 | No GitHub branch protection on `main`; rely on the `CLAUDE.md` rule | Branch protection on private repos requires a paid plan |
+| 12 | Spec-driven development: requirements → Gherkin specs → plan → TDD | Specs act as guardrail for AI-written code; examples are easier to review than code |
+| 13 | Domain rules as executable Gherkin in `specs/`, shared by web and backend | Same behaviour provably in phase 1 and phase 2, which matters for sync |
+| 14 | Implementation never changes specs or existing tests to make them pass | Prevents an AI from "fixing" the test instead of the code |

@@ -18,6 +18,26 @@ See [docs/roadmap.md](docs/roadmap.md) for phases and design decisions.
 - **Small vertical slices.** Each feature is usable end to end (UI + storage + tests) before starting the next.
 - **No AI features in the app itself.**
 
+## Spec-driven development (BDD / TDD)
+
+Every story follows these steps; the owner approves steps 2 and 3 before code is written.
+
+1. **Story:** pick a user story from [docs/requirements.md](docs/requirements.md) (e.g. US-08).
+2. **Spec:** write Given/When/Then scenarios in `specs/*.feature`, referencing the story ID.
+   Commit them first as `test(spec): …`; scenarios without step definitions report as pending, so the build stays green.
+3. **Plan:** propose the technical design and task list (plan mode).
+4. **TDD per scenario:** failing test → make it pass → refactor, then commit test and code together.
+5. **Review and PR.**
+
+Rules:
+
+- **Specs are the source of truth.** Code changes never modify `specs/` or existing tests to make them pass.
+  If a spec or test seems wrong, stop and ask the owner.
+- **Domain rules** (billed hours, balance, overlaps) are executable Gherkin, run with Cucumber.js now and Cucumber-JVM
+  in the backend later, so web and backend share the same specs.
+- **UI details** (e.g. autocomplete) are tested with plain Vitest + React Testing Library.
+- `specs/` lives at the repo root, not inside an app, because all apps share it.
+
 ## Stack
 
 - **Web (phase 1):** React + TypeScript (Vite), browser localStorage
