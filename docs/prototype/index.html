@@ -1,0 +1,813 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>body { margin: 0; } [hidden] { display: none !important; }</style>
+<title>Timetracker Prototype</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one working column (max 960px); summary strip on top, days below; entry form as a sheet over the page. */
+:root {
+  --bg: #F4F6F8;
+  --surface: #FFFFFF;
+  --ink: #16202B;
+  --muted: #5A6674;
+  --line: #DCE1E7;
+  --accent: #1D5E8A;
+  --accent-ink: #FFFFFF;
+  --accent-soft: #E2EDF5;
+  --nonbill: #B9C1CB;
+  --warn-fg: #8A5300;
+  --warn-bg: #FFF3DC;
+  --bad: #A3262A;
+  --good: #1D774A;
+  --shadow: 0 10px 40px rgba(22, 32, 43, .18);
+  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0F151B; --surface: #172029; --ink: #E5EBF1; --muted: #94A1AF; --line: #2A3643;
+    --accent: #6CB0E0; --accent-ink: #0B1520; --accent-soft: #1A3245; --nonbill: #4A5664;
+    --warn-fg: #F2B65C; --warn-bg: #36280F; --bad: #F08480; --good: #6CCB97;
+    --shadow: 0 10px 40px rgba(0, 0, 0, .5);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0F151B; --surface: #172029; --ink: #E5EBF1; --muted: #94A1AF; --line: #2A3643;
+  --accent: #6CB0E0; --accent-ink: #0B1520; --accent-soft: #1A3245; --nonbill: #4A5664;
+  --warn-fg: #F2B65C; --warn-bg: #36280F; --bad: #F08480; --good: #6CCB97;
+  --shadow: 0 10px 40px rgba(0, 0, 0, .5);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 15px/1.5 var(--font-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 48px;
+}
+.wrap { max-width: 960px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.proto-note {
+  margin-top: 12px; padding: 8px 12px; border-radius: 6px;
+  background: var(--accent-soft); color: var(--ink); font-size: 13px;
+  display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between;
+}
+.linkish { background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; font-size: 13px; }
+
+header.app { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.brand { font-family: var(--font-display); font-weight: 700; font-size: 22px; letter-spacing: -.01em; margin: 0; }
+.tabs { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 3px; }
+.tabs button { border: 0; background: none; padding: 6px 14px; border-radius: 6px; font-weight: 500; color: var(--muted); }
+.tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); }
+
+.period-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.period-nav { display: flex; align-items: center; gap: 6px; }
+.icon-btn {
+  width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface);
+  display: inline-grid; place-items: center; font-size: 16px;
+}
+.icon-btn:disabled { opacity: .4; cursor: default; }
+.period-title { font-family: var(--font-display); font-weight: 600; font-size: 20px; margin: 0; text-wrap: balance; }
+.period-sub { color: var(--muted); font-size: 13px; }
+.spacer { flex: 1; }
+.btn {
+  border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 8px 14px; font-weight: 500;
+}
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.danger { color: var(--bad); }
+
+.summary {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+}
+.metric { padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); margin: 0 -1px -1px 0; min-width: 0; }
+.metric .k { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.metric .v { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 24px; font-weight: 500; }
+.metric .n { font-size: 12px; color: var(--muted); }
+.metric .v.pos { color: var(--good); }
+.metric .v.neg { color: var(--bad); }
+.exp-input {
+  width: 100%; max-width: 120px; font-family: var(--font-mono); font-size: 22px; font-weight: 500;
+  border: 1px solid var(--line); border-radius: 6px; padding: 2px 8px; background: var(--bg);
+}
+.exp-input.invalid { border-color: var(--bad); }
+
+.days { display: flex; flex-direction: column; gap: 12px; }
+.day { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
+.day.active { border-color: var(--accent); }
+.day-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.day-name { font-weight: 600; background: none; border: 0; padding: 0; text-align: left; }
+.day:not(.active) { cursor: pointer; }
+.day:not(.active):hover { border-color: var(--muted); }
+.today-pill { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; background: var(--accent); color: var(--accent-ink); padding: 1px 7px; border-radius: 999px; }
+.day-total { color: var(--muted); font-size: 13px; }
+.day-head .btn { padding: 4px 10px; font-size: 13px; margin-left: auto; }
+.empty-day { color: var(--muted); font-size: 13px; }
+
+.timeline { position: relative; height: 10px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+.timeline span { position: absolute; top: 0; bottom: 0; background: var(--accent); border-right: 1px solid var(--surface); }
+.timeline span.nb { background: repeating-linear-gradient(135deg, var(--nonbill) 0 3px, transparent 3px 6px); }
+.tl-scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: -6px; }
+
+.entries { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.entry {
+  display: grid; grid-template-columns: 110px 52px minmax(0, 1fr) auto; gap: 12px; align-items: center;
+  padding: 7px 6px; border-top: 1px solid var(--line); border-radius: 4px; cursor: pointer; background: none; border-left: 0; border-right: 0; border-bottom: 0; text-align: left; width: 100%;
+}
+.entry:hover { background: var(--bg); }
+.entry .desc { min-width: 0; overflow-wrap: anywhere; }
+.entry .dur { color: var(--muted); }
+.entry.nonbill .desc { color: var(--muted); }
+.chip { font-size: 12px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; }
+.chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.chip.nb::before { background: none; border: 1.5px solid var(--nonbill); width: 4px; height: 4px; }
+.overlap-flag { color: var(--warn-fg); font-size: 12px; }
+
+@media (max-width: 560px) {
+  .entry { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "time chip" "desc desc"; row-gap: 2px; }
+  .entry .time { grid-area: time; }
+  .entry .dur { display: none; }
+  .entry .desc { grid-area: desc; }
+  .entry .lbl { grid-area: chip; justify-self: end; }
+  .metric .v { font-size: 20px; }
+}
+
+/* Settings */
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.panel h2 { font-family: var(--font-display); font-weight: 600; font-size: 18px; margin: 0; }
+.panel p.hint { margin: -6px 0 0; color: var(--muted); font-size: 13px; }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; position: relative; }
+.field label, .field .lab { font-size: 13px; font-weight: 500; }
+.field input[type="text"], .field input[type="date"], .field input[type="time"] {
+  border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; background: var(--bg); width: 100%;
+}
+.field .help { font-size: 12px; color: var(--muted); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; width: fit-content; }
+.seg button { border: 0; background: var(--surface); padding: 7px 16px; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.label-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.label-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); }
+.label-row .name { flex: 1; min-width: 0; }
+.switch { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.switch input { width: 36px; height: 20px; appearance: none; background: var(--nonbill); border-radius: 999px; position: relative; cursor: pointer; transition: background .15s; }
+.switch input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--surface); transition: transform .15s; }
+.switch input:checked { background: var(--accent); }
+.switch input:checked::after { transform: translateX(16px); }
+.add-label { display: flex; gap: 8px; flex-wrap: wrap; }
+.add-label input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; background: var(--bg); }
+
+/* Inline editor */
+.edit-row { border-top: 1px solid var(--line); padding: 10px 8px; background: var(--accent-soft); border-radius: 6px; }
+.edit-form { display: flex; flex-direction: column; gap: 8px; }
+.edit-grid { display: grid; grid-template-columns: 104px 104px minmax(0, 1fr) 150px; gap: 8px; align-items: start; }
+.edit-grid .field label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 500; }
+.edit-grid input { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; background: var(--surface); width: 100%; }
+.edit-grid .field .help { min-height: 18px; }
+.msg { font-size: 13px; padding: 6px 10px; border-radius: 6px; }
+.msg.warn { background: var(--warn-bg); color: var(--warn-fg); }
+.msg.err { color: var(--bad); border: 1px solid var(--bad); background: var(--surface); }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.actions .btn { padding: 5px 12px; font-size: 13px; }
+.actions .spacer { flex: 1; }
+.actions .keys { font-size: 12px; color: var(--muted); }
+@media (max-width: 560px) {
+  .edit-grid { grid-template-columns: 1fr 1fr; }
+  .edit-grid .wide { grid-column: 1 / -1; }
+  .actions .keys { display: none; }
+}
+
+/* Autocomplete */
+.ac-list {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 5; margin: 4px 0 0; padding: 4px; list-style: none;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); max-height: 240px; overflow-y: auto;
+}
+.ac-list li { padding: 7px 10px; border-radius: 5px; cursor: pointer; display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.ac-list li[aria-selected="true"] { background: var(--accent-soft); }
+.ac-list mark { background: none; color: var(--accent); font-weight: 600; }
+
+/* Sticky compact period header */
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.sticky-top {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg);
+  display: flex; flex-direction: column; gap: 8px; padding-block: 10px; border-bottom: 1px solid var(--line);
+}
+.sticky-top .period-title { font-size: 18px; }
+.sticky-top .summary { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.sticky-top .metric { padding: 8px 12px; gap: 0; }
+.sticky-top .metric .k { font-size: 11px; }
+.sticky-top .metric .v { font-size: 19px; }
+.sticky-top .exp-input { font-size: 17px; max-width: 96px; padding: 0 6px; }
+.day.collapsed { padding: 10px 16px; gap: 6px; cursor: pointer; }
+.day.collapsed .timeline { height: 6px; }
+.day-list { display: flex; flex-direction: column; gap: 10px; }
+.slide-next { animation: slide-next .22s ease-out; }
+.slide-prev { animation: slide-prev .22s ease-out; }
+@keyframes slide-next { from { transform: translateX(32px); opacity: .2; } }
+@keyframes slide-prev { from { transform: translateX(-32px); opacity: .2; } }
+@media (max-width: 560px) {
+  .sticky-top { gap: 6px; padding-block: 8px; }
+  .sticky-top .period-title { font-size: 16px; }
+  .sticky-top .icon-btn { width: 30px; height: 30px; }
+  .sticky-top .metric { padding: 6px 8px; }
+  .sticky-top .metric .k { font-size: 10px; letter-spacing: .04em; }
+  .sticky-top .metric .v { font-size: 16px; }
+  .sticky-top .metric .n { display: none; }
+  .sticky-top .exp-input { font-size: 15px; padding: 0 4px; }
+}
+/* Menu (phone only) and compact period row */
+.menu-wrap { position: relative; display: none; }
+.menu {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 30; min-width: 170px; padding: 4px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow);
+  display: flex; flex-direction: column;
+}
+.menu[hidden], .ac-list[hidden] { display: none; }
+.menu button { border: 0; background: none; text-align: left; padding: 9px 12px; border-radius: 6px; }
+.menu button[aria-current="page"] { background: var(--accent-soft); font-weight: 600; }
+.ptitle { min-width: 0; }
+.period-sub.short { display: none; }
+.icon-btn svg { width: 16px; height: 16px; }
+.settings-bar { display: none; }
+@media (max-width: 560px) {
+  header.app { display: none; }
+  .proto-note { font-size: 12px; padding: 6px 10px; margin-top: 8px; }
+  .wrap { gap: 10px; }
+  .menu-wrap { display: block; }
+  .settings-bar { display: flex; flex-direction: row; align-items: center; gap: 10px; }
+  .sticky-top .period-bar { flex-wrap: nowrap; gap: 6px; }
+  .ptitle { display: flex; align-items: baseline; gap: 6px; flex: 1; justify-content: center; white-space: nowrap; overflow: hidden; }
+  .ptitle .period-title { font-size: 15px; }
+  .ptitle .period-sub.full { display: none; }
+  .ptitle .period-sub.short { display: inline; }
+  .sticky-top .spacer { display: none; }
+  .sticky-top .summary { background: none; border: 0; border-radius: 0; }
+  .sticky-top .metric { border: 0; margin: 0; padding: 0 4px; }
+  .sticky-top .exp-input { background: var(--surface); }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="proto-note">
+    <span><strong>Prototype</strong> with sample data. Today is Tue 17 Nov 2026. Changes are not saved.</span>
+    <button class="linkish" id="reset" type="button">Reset sample data</button>
+  </div>
+
+  <header class="app">
+    <h1 class="brand">Timetracker</h1>
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true" type="button">Overview</button>
+      <button role="tab" id="tab-settings" aria-selected="false" type="button">Settings</button>
+    </div>
+  </header>
+
+  <main id="view"></main>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  const TODAY = "2026-11-17";
+
+  // ---------- time and date helpers ----------
+  const toMin = t => { if (!t) return null; const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+  const toTime = m => String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
+  const fmt = min => { const s = min < 0 ? "−" : ""; const a = Math.abs(Math.round(min)); return s + Math.floor(a / 60) + ":" + String(a % 60).padStart(2, "0"); };
+  const fmtSigned = min => (min > 0 ? "+" : "") + fmt(min);
+  function parseHours(str) {
+    const s = String(str).trim().replace(",", ".");
+    if (s === "") return null;
+    let m = s.match(/^([+−-])?(\d+):([0-5]\d)$/);
+    if (m) return (m[1] && m[1] !== "+" ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3]));
+    m = s.match(/^([+−-])?(\d+(?:\.\d+)?)$/);
+    if (m) return (m[1] && m[1] !== "+" ? -1 : 1) * Math.round(Number(m[2]) * 60);
+    return NaN;
+  }
+  const toDate = iso => { const [y, m, d] = iso.split("-").map(Number); return new Date(Date.UTC(y, m - 1, d)); };
+  const toIso = d => d.toISOString().slice(0, 10);
+  const addDays = (iso, n) => { const d = toDate(iso); d.setUTCDate(d.getUTCDate() + n); return toIso(d); };
+  const weekday = iso => (toDate(iso).getUTCDay() + 6) % 7; // 0 = Monday
+  const monday = iso => addDays(iso, -weekday(iso));
+  const fmtDay = (iso, opts) => toDate(iso).toLocaleDateString("en-GB", Object.assign({ timeZone: "UTC" }, opts));
+  function isoWeek(iso) {
+    const d = toDate(iso); d.setUTCDate(d.getUTCDate() - weekday(iso) + 3);
+    const jan4 = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
+    return 1 + Math.round(((d - jan4) / 864e5 - 3 + (jan4.getUTCDay() + 6) % 7) / 7);
+  }
+
+  // ---------- periods ----------
+  const periodKey = (iso, cycle) => cycle === "week" ? monday(iso) : iso.slice(0, 7);
+  function periodDates(key, cycle) {
+    if (cycle === "week") return Array.from({ length: 7 }, (_, i) => addDays(key, i));
+    const out = []; let d = key + "-01";
+    while (d.slice(0, 7) === key) { out.push(d); d = addDays(d, 1); }
+    return out;
+  }
+  function shiftKey(key, cycle, n) {
+    if (cycle === "week") return addDays(key, 7 * n);
+    let [y, m] = key.split("-").map(Number); m += n;
+    while (m > 12) { m -= 12; y++; } while (m < 1) { m += 12; y--; }
+    return y + "-" + String(m).padStart(2, "0");
+  }
+
+  // ---------- sample data ----------
+  let seq = 0; const uid = () => "e" + (++seq);
+  function sampleState() {
+    seq = 0;
+    const labels = [
+      { id: "project", name: "Project", billable: true },
+      { id: "meeting", name: "Meeting", billable: true },
+      { id: "support", name: "Support", billable: true },
+      { id: "lunch", name: "Lunch", billable: false },
+      { id: "private", name: "Private", billable: false },
+    ];
+    const work = ["Invoice export API", "Time entry validation", "Payment provider integration", "Bugfix: VAT rounding", "Customer portal login"];
+    const entries = [];
+    const add = (date, s, e, desc, labelId) => entries.push({ id: uid(), date, start: s, end: e, desc, labelId });
+    function day(date, billable, i, opts = {}) {
+      add(date, "08:30", "08:45", "Daily standup", "meeting");
+      add(date, "08:45", "12:30", work[i % work.length], "project");
+      add(date, "12:30", "13:00", "Lunch", "lunch");
+      if (opts.halfDay) return;
+      const rest = billable - 240;
+      if (i % 3 === 1) {
+        add(date, "13:00", "14:00", "Sprint refinement", "meeting");
+        add(date, "14:00", toTime(14 * 60 + rest - 60), work[(i + 1) % work.length], "project");
+      } else {
+        add(date, "13:00", toTime(13 * 60 + rest), work[(i + 1) % work.length], "project");
+      }
+      if (opts.privateAfter) { const e = 13 * 60 + rest; add(date, toTime(e), toTime(e + 30), opts.privateAfter, "private"); }
+    }
+    // Week 44: 44 hours worked
+    [540, 540, 540, 510, 510].forEach((b, i) => day(addDays("2026-10-26", i), b, i));
+    // Week 45: 32 hours (Friday off)
+    [480, 480, 480, 480].forEach((b, i) => day(addDays("2026-11-02", i), b, i + 2, i === 2 ? { privateAfter: "Dentist" } : {}));
+    // Week 46: holiday, nothing logged
+    // Week 47: Monday full, Tuesday (today) morning only
+    day("2026-11-16", 480, 1);
+    day("2026-11-17", 240, 3, { halfDay: true });
+    // Support request on Monday afternoon overlapping project time (shows the overlap warning)
+    add("2026-11-16", "16:00", "16:30", "Customer call about invoice", "support");
+    return {
+      contract: { start: "2026-10-26", cycle: "week", limit: 36 * 60, startBalance: 0 },
+      labels, entries,
+      expected: { "2026-10-26": 2160, "2026-11-02": 2160, "2026-11-09": 0, "2026-11-16": 2160 },
+      view: "overview",
+      current: monday(TODAY),
+    };
+  }
+  let S = sampleState();
+
+  // ---------- calculations ----------
+  const label = id => S.labels.find(l => l.id === id);
+  const dur = e => toMin(e.end) - toMin(e.start);
+  const inContract = iso => iso >= S.contract.start;
+  function entriesOn(date) { return S.entries.filter(e => e.date === date).sort((a, b) => a.start.localeCompare(b.start) || a.end.localeCompare(b.end)); }
+  function worked(key) {
+    const dates = new Set(periodDates(key, S.contract.cycle));
+    return S.entries.filter(e => dates.has(e.date) && inContract(e.date) && label(e.labelId)?.billable).reduce((s, e) => s + dur(e), 0);
+  }
+  function nonBillable(key) {
+    const dates = new Set(periodDates(key, S.contract.cycle));
+    return S.entries.filter(e => dates.has(e.date) && !label(e.labelId)?.billable).reduce((s, e) => s + dur(e), 0);
+  }
+  const billed = key => S.expected[key] == null ? 0 : Math.min(S.contract.limit, S.expected[key]);
+  function balanceBefore(key) {
+    let bal = S.contract.startBalance;
+    for (let k = periodKey(S.contract.start, S.contract.cycle); k < key; k = shiftKey(k, S.contract.cycle, 1)) bal += worked(k) - billed(k);
+    return bal;
+  }
+  function overlaps(e, list) {
+    const s = toMin(e.start), t = toMin(e.end);
+    return list.filter(o => o.id !== e.id && o.date === e.date && toMin(o.start) < t && s < toMin(o.end));
+  }
+
+  // ---------- rendering ----------
+  const view = document.getElementById("view");
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  function menuHtml() {
+    return `<div class="menu-wrap">
+      <button class="icon-btn" type="button" id="menu-btn" aria-label="Menu" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12"/></svg></button>
+      <div class="menu" id="menu" hidden>
+        <button type="button" data-view="overview" ${S.view === "overview" ? 'aria-current="page"' : ""}>Overview</button>
+        <button type="button" data-view="settings" ${S.view === "settings" ? 'aria-current="page"' : ""}>Settings</button>
+      </div>
+    </div>`;
+  }
+  function bindMenu() {
+    const btn = document.getElementById("menu-btn"), menu = document.getElementById("menu");
+    if (!btn) return;
+    btn.onclick = () => { menu.hidden = !menu.hidden; btn.setAttribute("aria-expanded", !menu.hidden); };
+    menu.querySelectorAll("[data-view]").forEach(b => b.onclick = () => { S.view = b.dataset.view; render(); window.scrollTo(0, 0); });
+  }
+  document.addEventListener("click", ev => {
+    const menu = document.getElementById("menu");
+    if (menu && !menu.hidden && !ev.target.closest(".menu-wrap")) { menu.hidden = true; document.getElementById("menu-btn").setAttribute("aria-expanded", "false"); }
+  });
+  document.addEventListener("keydown", ev => { const menu = document.getElementById("menu"); if (ev.key === "Escape" && menu && !menu.hidden) { menu.hidden = true; document.getElementById("menu-btn").focus(); } });
+
+  function render() {
+    document.getElementById("tab-overview").setAttribute("aria-selected", S.view === "overview");
+    document.getElementById("tab-settings").setAttribute("aria-selected", S.view === "settings");
+    S.view === "overview" ? renderOverview() : renderSettings();
+    bindMenu();
+  }
+
+  function periodTitle(key) {
+    const c = S.contract.cycle, dates = periodDates(key, c);
+    if (c === "month") return { title: fmtDay(dates[0], { month: "long", year: "numeric" }), sub: "Monthly billing period", short: "" };
+    const a = dates[0], b = dates[6];
+    return { title: "Week " + isoWeek(a), sub: fmtDay(a, { day: "numeric", month: "short" }) + " – " + fmtDay(b, { day: "numeric", month: "short", year: "numeric" }),
+      short: "· " + fmtDay(a, { day: "numeric" }) + "–" + fmtDay(b, { day: "numeric", month: "short" }) };
+  }
+
+  function renderOverview() {
+    const c = S.contract.cycle, key = S.current, dates = periodDates(key, c);
+    const firstKey = periodKey(S.contract.start, c);
+    const isPast = dates[dates.length - 1] < TODAY;
+    const w = worked(key), b = billed(key), nb = nonBillable(key), carried = balanceBefore(key);
+    const exp = S.expected[key];
+    const t = periodTitle(key);
+    const cycleWord = c === "week" ? "week" : "month";
+
+    let leftMetric;
+    if (isPast) {
+      const after = carried + w - b;
+      leftMetric = `<div class="metric"><span class="k" title="Balance after ${cycleWord}">Balance after</span><span class="v ${after > 0 ? "pos" : after < 0 ? "neg" : ""}">${fmtSigned(after)}</span><span class="n">${after >= 0 ? "Hours built up" : "Hours still to work"}</span></div>`;
+    } else {
+      const left = b - w;
+      leftMetric = `<div class="metric"><span class="k">Left</span><span class="v num">${fmt(Math.max(0, left))}</span><span class="n">${left < 0 ? fmt(-left) + " more than expected" : "Expected minus worked"}</span></div>`;
+    }
+
+    if (!dates.includes(A)) A = defaultActive(key);
+    // Newest day on top; no days after today.
+    const visibleDates = dates.filter(d => d <= TODAY && (weekday(d) < 5 || entriesOn(d).length || d === TODAY || d === A)).reverse();
+    view.innerHTML = `
+      <div class="sticky-top">
+        <div class="period-bar">
+          ${menuHtml()}
+          <button class="icon-btn" id="prev" type="button" aria-label="Previous ${cycleWord}" ${key <= firstKey ? "disabled" : ""}>‹</button>
+          <div class="ptitle"><h2 class="period-title">${t.title}</h2><span class="period-sub short">${t.short}</span><div class="period-sub full">${t.sub}</div></div>
+          <button class="icon-btn" id="next" type="button" aria-label="Next ${cycleWord}" ${shiftKey(key, c, 1) > periodKey(TODAY, c) ? "disabled" : ""}>›</button>
+          <span class="spacer"></span>
+          ${key !== periodKey(TODAY, c) ? `<button class="icon-btn" id="to-today" type="button" aria-label="Go to today" title="Go to today"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="3" width="12" height="11" rx="2"/><path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3"/><circle cx="8" cy="10" r="1.6" fill="currentColor" stroke="none"/></svg></button>` : ""}
+        </div>
+        <section class="summary" aria-label="Period summary">
+          <div class="metric"><span class="k" title="Balance carried in from earlier ${cycleWord}s">Balance in</span><span class="v ${carried > 0 ? "pos" : carried < 0 ? "neg" : ""}">${fmtSigned(carried)}</span><span class="n">From earlier ${cycleWord}s</span></div>
+          <div class="metric">
+            <label class="k" for="exp" title="Expected billable hours">Expected</label>
+            <input class="exp-input" id="exp" inputmode="decimal" value="${exp == null ? "" : fmt(exp)}" placeholder="36">
+            <span class="n" id="exp-note">${exp == null ? "Enter at the start of the " + cycleWord : exp > S.contract.limit ? "Capped at " + fmt(S.contract.limit) + " by contract" : "Limit " + fmt(S.contract.limit)}</span>
+          </div>
+          <div class="metric"><span class="k">Worked</span><span class="v num">${fmt(w)}</span><span class="n">${nb ? "+ " + fmt(nb) + " non-billable" : "Billable labels only"}</span></div>
+          ${leftMetric}
+        </section>
+      </div>
+      <div class="day-list ${slideDir ? "slide-" + slideDir : ""}" style="margin-top:12px">${visibleDates.map(renderDay).join("")}</div>`;
+    slideDir = null;
+
+    document.getElementById("prev").onclick = () => { slideDir = "prev"; goTo(shiftKey(key, c, -1)); };
+    document.getElementById("next").onclick = () => { slideDir = "next"; goTo(shiftKey(key, c, 1)); };
+    document.getElementById("to-today")?.addEventListener("click", () => goTo(periodKey(TODAY, c)));
+    const expInput = document.getElementById("exp");
+    expInput.addEventListener("change", () => {
+      const v = parseHours(expInput.value);
+      if (Number.isNaN(v) || (v != null && v < 0)) { expInput.classList.add("invalid"); document.getElementById("exp-note").textContent = "Use hours like 36 or 36:00"; return; }
+      if (v == null) delete S.expected[key]; else S.expected[key] = v;
+      render();
+    });
+    view.querySelectorAll(".day:not(.active)").forEach(el => el.onclick = ev => { if (!ev.target.closest("[data-entry]")) startEdit(el.dataset.date, null); });
+    view.querySelectorAll("[data-entry]").forEach(el => el.onclick = () => { const e = S.entries.find(x => x.id === el.dataset.entry); startEdit(e.date, e.id); });
+    bindEditor();
+  }
+
+  function renderDay(date) {
+    const list = entriesOn(date);
+    const bill = list.filter(e => label(e.labelId)?.billable).reduce((s, e) => s + dur(e), 0);
+    const from = Math.min(7 * 60, ...list.map(e => toMin(e.start))), to = Math.max(19 * 60, ...list.map(e => toMin(e.end)));
+    const span = to - from;
+    const bars = list.map(e => {
+      const nb = !label(e.labelId)?.billable;
+      return `<span class="${nb ? "nb" : ""}" style="left:${(toMin(e.start) - from) / span * 100}%;width:${dur(e) / span * 100}%"></span>`;
+    }).join("");
+    const isActive = date === A;
+    const rows = list.map(e => {
+      if (isActive && E === e.id) return editRow(true);
+      const l = label(e.labelId), nb = !l?.billable, ov = overlaps(e, list).length;
+      return `<li><button type="button" class="entry ${nb ? "nonbill" : ""}" data-entry="${e.id}">
+        <span class="time num">${e.start}–${e.end}</span>
+        <span class="dur num">${fmt(dur(e))}</span>
+        <span class="desc">${esc(e.desc || "—")}${ov ? ` <span class="overlap-flag">· overlaps</span>` : ""}</span>
+        <span class="lbl"><span class="chip ${nb ? "nb" : ""}">${esc(l ? l.name : "?")}</span></span>
+      </button></li>`;
+    }).join("");
+    const isToday = date === TODAY;
+    if (!isActive) {
+      const anyOverlap = list.some(e => overlaps(e, list).length);
+      return `<section class="day collapsed" data-date="${date}" aria-label="${fmtDay(date, { weekday: "long", day: "numeric", month: "long" })}">
+        <div class="day-head">
+          <button type="button" class="day-name" aria-label="Open ${fmtDay(date, { weekday: "long", day: "numeric", month: "long" })}">${fmtDay(date, { weekday: "short", day: "numeric", month: "short" })}</button>
+          ${isToday ? `<span class="today-pill">Today</span>` : ""}
+          <span class="day-total num">${list.length ? fmt(bill) + " worked · " + list.length + (list.length === 1 ? " entry" : " entries") : "Nothing logged"}</span>
+          ${anyOverlap ? `<span class="overlap-flag">overlaps</span>` : ""}
+        </div>
+        ${list.length ? `<div class="timeline" aria-hidden="true">${bars}</div>` : ""}
+      </section>`;
+    }
+    return `<section class="day ${isActive ? "active" : ""}" data-date="${date}" aria-label="${fmtDay(date, { weekday: "long", day: "numeric", month: "long" })}">
+      <div class="day-head">
+        <button type="button" class="day-name" aria-label="Log on ${fmtDay(date, { weekday: "long", day: "numeric", month: "long" })}">${fmtDay(date, { weekday: "short", day: "numeric", month: "short" })}</button>
+        ${isToday ? `<span class="today-pill">Today</span>` : ""}
+        <span class="day-total num">${list.length ? fmt(bill) + " worked" : ""}</span>
+      </div>
+      ${list.length ? `<div class="timeline" aria-hidden="true">${bars}</div>
+        <div class="tl-scale num" aria-hidden="true"><span>${toTime(from)}</span><span>${toTime(to)}</span></div>` : ""}
+      ${list.length || isActive ? `<ul class="entries">${rows}${isActive && !E ? editRow(false) : ""}</ul>` : `<div class="empty-day">Nothing logged</div>`}
+    </section>`;
+  }
+
+  function editRow(existing) {
+    return `<li class="edit-row"><form class="edit-form" id="ie-form" novalidate autocomplete="off">
+      <div class="edit-grid">
+        <div class="field"><label for="ie-start">Start</label><input type="time" id="ie-start" step="900"><span class="help" id="ie-start-help"></span></div>
+        <div class="field"><label for="ie-end">End</label><input type="time" id="ie-end" step="900"><span class="help" id="ie-dur"></span></div>
+        <div class="field wide"><label for="ie-desc">Description</label>
+          <input type="text" id="ie-desc" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="ac-desc" placeholder="Type to see earlier descriptions">
+          <ul class="ac-list" id="ac-desc" role="listbox" hidden></ul></div>
+        <div class="field wide"><label for="ie-label">Label</label>
+          <input type="text" id="ie-label" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="ac-label" placeholder="Type a few letters">
+          <ul class="ac-list" id="ac-label" role="listbox" hidden></ul><span class="help" id="ie-label-help"></span></div>
+      </div>
+      <div id="ie-msgs"></div>
+      <div class="actions">
+        <button type="submit" class="btn primary">Save</button>
+        <button type="button" class="btn" id="ie-cancel">Cancel</button>
+        ${existing ? `<button type="button" class="btn danger" id="ie-delete">Delete</button>` : ""}
+        <span class="spacer"></span>
+        <span class="keys">Enter saves · Esc cancels</span>
+      </div>
+    </form></li>`;
+  }
+
+  function renderSettings() {
+    const c = S.contract;
+    view.innerHTML = `
+      <div class="sticky-top settings-bar">${menuHtml()}<h2 class="period-title">Settings</h2></div>
+      <div class="days" style="gap:16px">
+        <section class="panel">
+          <h2>Contract</h2>
+          <p class="hint">These settings drive how billed hours and the balance are calculated.</p>
+          <div class="fields">
+            <div class="field">
+              <span class="lab" id="cycle-lab">Billing cycle</span>
+              <div class="seg" role="group" aria-labelledby="cycle-lab">
+                <button type="button" id="cyc-week" aria-pressed="${c.cycle === "week"}">Week</button>
+                <button type="button" id="cyc-month" aria-pressed="${c.cycle === "month"}">Month</button>
+              </div>
+              <span class="help">With a monthly cycle everything is per month.</span>
+            </div>
+            <div class="field">
+              <label for="s-limit">Billable limit per ${c.cycle}</label>
+              <input type="text" id="s-limit" inputmode="decimal" value="${fmt(c.limit)}">
+              <span class="help">The most you may bill in one ${c.cycle}.</span>
+            </div>
+            <div class="field">
+              <label for="s-start">Contract start</label>
+              <input type="date" id="s-start" value="${c.start}">
+            </div>
+            <div class="field">
+              <label for="s-balance">Starting balance</label>
+              <input type="text" id="s-balance" inputmode="decimal" value="${fmtSigned(c.startBalance)}">
+              <span class="help">Use when you start halfway through a project. + is built up, − is still to work.</span>
+            </div>
+          </div>
+        </section>
+        <section class="panel">
+          <h2>Labels</h2>
+          <p class="hint">Only billable labels count as worked hours.</p>
+          <ul class="label-list">
+            ${S.labels.map(l => `<li class="label-row">
+              <span class="name"><span class="chip ${l.billable ? "" : "nb"}">${esc(l.name)}</span></span>
+              <label class="switch"><input type="checkbox" data-label="${l.id}" id="bill-${l.id}" ${l.billable ? "checked" : ""}> Billable</label>
+            </li>`).join("")}
+          </ul>
+          <form class="add-label" id="add-label">
+            <input type="text" id="new-label" placeholder="New label name" aria-label="New label name">
+            <button class="btn" type="submit">Add label</button>
+          </form>
+        </section>
+      </div>`;
+
+    const setCycle = cy => {
+      if (cy === c.cycle) return;
+      c.cycle = cy;
+      c.limit = cy === "month" ? 156 * 60 : 36 * 60;
+      S.current = periodKey(TODAY, cy);
+      render();
+    };
+    document.getElementById("cyc-week").onclick = () => setCycle("week");
+    document.getElementById("cyc-month").onclick = () => setCycle("month");
+    const num = (id, fn) => document.getElementById(id).addEventListener("change", ev => {
+      const v = parseHours(ev.target.value);
+      if (v == null || Number.isNaN(v)) { ev.target.style.borderColor = "var(--bad)"; return; }
+      ev.target.style.borderColor = ""; fn(v); render();
+    });
+    num("s-limit", v => { c.limit = Math.max(0, v); });
+    num("s-balance", v => { c.startBalance = v; });
+    document.getElementById("s-start").addEventListener("change", ev => { if (ev.target.value) { c.start = ev.target.value; render(); } });
+    view.querySelectorAll("[data-label]").forEach(el => el.onchange = () => { label(el.dataset.label).billable = el.checked; render(); });
+    document.getElementById("add-label").onsubmit = ev => {
+      ev.preventDefault();
+      const name = document.getElementById("new-label").value.trim();
+      if (!name || S.labels.some(l => l.name.toLowerCase() === name.toLowerCase())) return;
+      S.labels.push({ id: "l" + Date.now(), name, billable: true });
+      render();
+    };
+  }
+
+  // ---------- autocomplete ----------
+  function combobox(input, list, getItems, onPick) {
+    let items = [], active = -1;
+    const close = () => { list.hidden = true; input.setAttribute("aria-expanded", "false"); input.removeAttribute("aria-activedescendant"); active = -1; };
+    const paint = () => {
+      list.querySelectorAll("li").forEach((li, i) => li.setAttribute("aria-selected", i === active));
+      if (active >= 0) { input.setAttribute("aria-activedescendant", list.id + "-" + active); list.children[active].scrollIntoView({ block: "nearest" }); }
+    };
+    const open = () => {
+      items = getItems(input.value.trim());
+      if (!items.length) return close();
+      list.innerHTML = items.map((it, i) => `<li role="option" id="${list.id}-${i}">${it.html}</li>`).join("");
+      list.hidden = false; input.setAttribute("aria-expanded", "true");
+      active = input.value.trim() ? 0 : -1; paint();
+      list.querySelectorAll("li").forEach((li, i) => li.addEventListener("pointerdown", ev => { ev.preventDefault(); pick(i); }));
+    };
+    const pick = i => { onPick(items[i]); close(); };
+    input.addEventListener("input", open);
+    input.addEventListener("focus", open);
+    input.addEventListener("blur", () => setTimeout(close, 0));
+    input.addEventListener("keydown", ev => {
+      if (list.hidden) { if (ev.key === "ArrowDown") { open(); ev.preventDefault(); } return; }
+      if (ev.key === "ArrowDown") { active = Math.min(items.length - 1, active + 1); paint(); ev.preventDefault(); }
+      else if (ev.key === "ArrowUp") { active = Math.max(0, active - 1); paint(); ev.preventDefault(); }
+      else if (ev.key === "Enter" && active >= 0) { pick(active); ev.preventDefault(); }
+      else if (ev.key === "Tab" && active >= 0) { pick(active); }
+      else if (ev.key === "Escape") { close(); ev.stopPropagation(); }
+    });
+  }
+  const highlight = (text, q) => {
+    if (!q) return esc(text);
+    const i = text.toLowerCase().indexOf(q.toLowerCase());
+    return i < 0 ? esc(text) : esc(text.slice(0, i)) + "<mark>" + esc(text.slice(i, i + q.length)) + "</mark>" + esc(text.slice(i + q.length));
+  };
+
+  // ---------- inline editor ----------
+  // A = active day (always shows an empty row at the bottom); E = id of the entry being edited, or null.
+  let A = TODAY, E = null, pendingFocus = false, slideDir = null;
+  function defaultActive(key) { const d = periodDates(key, S.contract.cycle); return d.includes(TODAY) ? TODAY : d.filter(x => weekday(x) < 5).pop(); }
+  function goTo(key) { S.current = key; A = defaultActive(key); E = null; render(); }
+  function startEdit(date, id) { A = date; E = id; pendingFocus = true; render(); }
+
+  function bindEditor() {
+    const form = document.getElementById("ie-form");
+    if (!form) return;
+    const $ = id => document.getElementById(id);
+    const f = { start: $("ie-start"), end: $("ie-end"), desc: $("ie-desc"), label: $("ie-label"),
+      startHelp: $("ie-start-help"), dur: $("ie-dur"), labelHelp: $("ie-label-help"), msgs: $("ie-msgs") };
+    const entry = E ? S.entries.find(x => x.id === E) : null;
+    let startTouched = false, endTouched = !!entry, deleteArmed = false;
+
+    if (entry) {
+      f.start.value = entry.start; f.end.value = entry.end; f.desc.value = entry.desc; f.label.value = label(entry.labelId)?.name || "";
+    } else {
+      const prev = S.entries.filter(e => e.date === A).sort((a, b) => b.end.localeCompare(a.end))[0];
+      // First entry of the day: same weekday last week, else the most recent earlier day with entries, else 09:00.
+      const firstStart = d => entriesOn(d)[0]?.start;
+      const weekAgo = addDays(A, -7);
+      const dayBefore = S.entries.map(e => e.date).filter(d => d < A).sort().pop();
+      let start, hint;
+      if (prev) { start = prev.end; hint = "From previous entry"; }
+      else if (firstStart(weekAgo)) { start = firstStart(weekAgo); hint = "Same as " + fmtDay(weekAgo, { weekday: "short", day: "numeric", month: "short" }); }
+      else if (dayBefore) { start = firstStart(dayBefore); hint = "Same as " + fmtDay(dayBefore, { weekday: "short", day: "numeric", month: "short" }); }
+      else { start = "09:00"; hint = "Default start"; }
+      f.start.value = start;
+      f.end.value = start;
+      f.startHelp.textContent = hint;
+    }
+
+    function check(saving) {
+      const msgs = [];
+      const s = toMin(f.start.value), e = toMin(f.end.value);
+      f.dur.textContent = s != null && e != null && e > s ? "Duration " + fmt(e - s) : "";
+      // End starts equal to start; only complain once the user changed it or tries to save.
+      if (s != null && e != null && (e < s || (e === s && (endTouched || saving)))) msgs.push(`<div class="msg err">End must be after start. Entries can't run past midnight; split it into two entries.</div>`);
+      if (s != null && e != null && e > s) {
+        const ov = overlaps({ id: entry?.id, date: A, start: f.start.value, end: f.end.value }, S.entries);
+        if (ov.length) msgs.push(`<div class="msg warn">Overlaps with ${ov.map(o => `“${esc(o.desc || label(o.labelId)?.name)}” ${o.start}–${o.end}`).join(", ")}. You can still save.</div>`);
+      }
+      const l = S.labels.find(x => x.name.toLowerCase() === f.label.value.trim().toLowerCase());
+      f.labelHelp.textContent = l ? (l.billable ? "Billable" : "Non-billable") : "";
+      f.msgs.innerHTML = msgs.join("");
+      return { s, e, l };
+    }
+    check();
+
+    f.start.addEventListener("input", () => {
+      startTouched = true; f.startHelp.textContent = "";
+      if (!endTouched) f.end.value = f.start.value;
+      check();
+    });
+    f.end.addEventListener("input", () => { endTouched = true; check(); });
+    f.label.addEventListener("input", check);
+
+    form.addEventListener("submit", ev => {
+      ev.preventDefault();
+      const { s, e, l } = check(true);
+      const errs = [];
+      if (s == null || e == null) errs.push("Enter a start and end time.");
+      if (!l) errs.push(f.label.value.trim() ? `There is no label “${esc(f.label.value.trim())}”. Pick one from the list or add it in Settings.` : "Pick a label.");
+      if (errs.length || e <= s) { if (errs.length) f.msgs.insertAdjacentHTML("afterbegin", `<div class="msg err">${errs.join(" ")}</div>`); return; }
+      const data = { date: A, start: f.start.value, end: f.end.value, desc: f.desc.value.trim(), labelId: l.id };
+      if (entry) Object.assign(entry, data); else S.entries.push(Object.assign({ id: uid() }, data));
+      E = null; pendingFocus = !entry; render();
+    });
+    const cancel = () => {
+      if (entry) { E = null; render(); return; }
+      f.start.value = ""; f.end.value = ""; f.desc.value = ""; f.label.value = ""; render();
+    };
+    $("ie-cancel").onclick = cancel;
+    form.addEventListener("keydown", ev => { if (ev.key === "Escape") { ev.preventDefault(); cancel(); } });
+    const del = $("ie-delete");
+    if (del) del.onclick = () => {
+      if (!deleteArmed) { deleteArmed = true; del.textContent = "Click again to delete"; return; }
+      S.entries = S.entries.filter(x => x !== entry); E = null; render();
+    };
+
+    combobox(f.desc, $("ac-desc"), q => {
+      const seen = new Set(), out = [];
+      const sorted = [...S.entries].sort((a, b) => (b.date + b.start).localeCompare(a.date + a.start));
+      for (const e of sorted) {
+        const k = (e.desc || "").toLowerCase();
+        if (!e.desc || seen.has(k)) continue; seen.add(k);
+        if (q && !k.includes(q.toLowerCase())) continue;
+        const l = label(e.labelId);
+        out.push({ desc: e.desc, labelName: l?.name || "", html: `<span>${highlight(e.desc, q)}</span><span class="chip ${l?.billable ? "" : "nb"}">${esc(l?.name || "")}</span>` });
+        if (out.length >= 6) break;
+      }
+      return out;
+    }, it => { f.desc.value = it.desc; f.label.value = it.labelName; check(); f.label.focus(); });
+
+    combobox(f.label, $("ac-label"), q => S.labels
+      .filter(l => !q || l.name.toLowerCase().includes(q.toLowerCase()))
+      .map(l => ({ name: l.name, html: `<span>${highlight(l.name, q)}</span><span class="help">${l.billable ? "Billable" : "Non-billable"}</span>` })),
+      it => { f.label.value = it.name; check(); });
+
+    if (pendingFocus) {
+      pendingFocus = false;
+      (entry ? f.desc : (f.start.value ? f.end : f.start)).focus();
+      form.scrollIntoView({ block: "nearest" });
+    }
+  }
+
+  // ---------- swipe left/right to change period (phones) ----------
+  let sx = null, sy = 0, st = 0;
+  view.addEventListener("touchstart", ev => {
+    if (S.view !== "overview" || ev.touches.length !== 1 || ev.target.closest("input, .ac-list")) { sx = null; return; }
+    sx = ev.touches[0].clientX; sy = ev.touches[0].clientY; st = Date.now();
+  }, { passive: true });
+  view.addEventListener("touchend", ev => {
+    if (sx == null) return;
+    const t = ev.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+    sx = null;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < 1.5 * Math.abs(dy) || Date.now() - st > 700) return;
+    document.getElementById(dx < 0 ? "next" : "prev")?.click();
+  });
+
+  // ---------- tabs and reset ----------
+  document.getElementById("tab-overview").onclick = () => { S.view = "overview"; render(); };
+  document.getElementById("tab-settings").onclick = () => { S.view = "settings"; render(); };
+  document.getElementById("reset").onclick = () => { S = sampleState(); A = TODAY; E = null; render(); };
+
+  render();
+})();
+</script>
+
+</body>
+</html>
