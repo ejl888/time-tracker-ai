@@ -17,7 +17,7 @@ Track working time in a web app and a mobile app that stay in sync, replacing th
 
 1. ~~Requirements from the current Google Sheets workflow~~ → [requirements.md](requirements.md)
 2. ~~GitHub remote, rebase merge only~~
-3. Clickable UI prototype (period overview, add entry, settings)
+3. ~~Clickable UI prototype~~ → [prototype/index.html](prototype/index.html); findings in [requirements.md](requirements.md)
 4. Gherkin specs for the Must stories
 5. Scaffold the web app (Vite, React, TypeScript, Vitest, Cucumber.js); complete `CLAUDE.md`, agent definitions,
    `docs/data-model.md`
