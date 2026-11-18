@@ -107,6 +107,7 @@ _Priority: **Must** (first version), **Should** (soon after), **Could** (later).
 | US-19 | As a user, I want to swipe left and right on my phone to go to the next and previous period, so that I can browse periods with one hand. | Must |
 | US-20 | As a user, I want to add a new contract when my contract or client changes, with its own billing cycle, limit and starting balance, so that each contract has its own balance. | Should |
 | US-21 | As a user, I want to move an entry to another day by dragging it, so that I can fix an entry logged on the wrong day. | Could |
+| US-22 | As a user, I want the next entry's start time to follow when I change an entry's end time (and the previous entry's end time to follow when I change a start time), so that adjacent entries stay adjacent without editing both. | Should |
 
 ### Rules
 
@@ -119,6 +120,9 @@ _Priority: **Must** (first version), **Should** (soon after), **Could** (later).
 - Expected billable hours are entered once the period has started; future periods cannot be opened.
 - When no expected billable hours are entered for a period, billed hours are 0.
 - Weeks run from Monday to Sunday.
+- Every entry needs a label; the description is optional.
+- A label's billable setting cannot be changed once an entry (not deleted) uses it, so earlier periods never change.
+  Create a new label instead. Renaming a label is always allowed.
 
 #### Entering time
 
@@ -128,6 +132,10 @@ _Priority: **Must** (first version), **Should** (soon after), **Could** (later).
 - The end time starts equal to the start time; the app only reports "end must be after start" once the end time was
   changed or on save.
 - Enter saves, Esc cancels. After saving a new entry the next empty row opens with the cursor on the end time.
+- Linked times (US-22): when I change an entry's end time and the next entry started exactly at the old end time, that
+  entry's start time moves along; when I change a start time, the previous entry's end time follows the same way.
+  Only the directly adjacent entry changes; entries after a gap are left alone. If the adjacent entry would end up
+  with no time left, it is not changed and the day shows an overlap warning instead.
 
 #### Overview layout
 
