@@ -117,6 +117,8 @@ _Priority: **Must** (first version), **Should** (soon after), **Could** (later).
 - Hours left to work = billed hours − worked hours in the current period. The balance is shown separately.
 - Billed hours are not shown separately; when the expected billable hours exceed the limit, a note says they are capped.
 - Expected billable hours are entered once the period has started; future periods cannot be opened.
+- When no expected billable hours are entered for a period, billed hours are 0.
+- Weeks run from Monday to Sunday.
 
 #### Entering time
 
