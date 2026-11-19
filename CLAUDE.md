@@ -64,6 +64,9 @@ Verify every commit of a branch before opening a PR (from the repo root; commits
 git rebase --exec '[ ! -f web/package.json ] || (cd web && npm ci && npm run check)' main
 ```
 
+CI (GitHub Actions, `.github/workflows/check.yml`) runs `npm ci` and `npm run check` on every pull request and push to
+`main`.
+
 ## Design rules (keep sync possible)
 
 - Components never call `localStorage` directly; all data access goes through a repository interface.
