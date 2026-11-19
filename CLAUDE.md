@@ -12,7 +12,7 @@ See [docs/roadmap.md](docs/roadmap.md) for phases and design decisions.
   Types: `feat`, `fix`, `docs`, `test`, `refactor`, `chore`, `build`, `ci`.
   Scopes: `web`, `backend`, `mobile`. Use `!` or a `BREAKING CHANGE:` footer for breaking changes.
 - **Every commit is green.** Each commit must build and pass all tests on its own, not just the branch tip.
-  Before opening a PR, verify with `git rebase --exec "<build and test command>" main`.
+  Before opening a PR, verify every commit with the rebase command under [Commands](#commands).
 - **Rebase merge, no squash.** Every commit lands on `main` as-is, so each must be meaningful.
   Clean up branch history (fold WIP and fixup commits) before merging.
 - **Small vertical slices.** Each feature is usable end to end (UI + storage + tests) before starting the next.
@@ -41,10 +41,28 @@ Rules:
 
 ## Stack
 
-- **Web (phase 1):** React + TypeScript (Vite), browser localStorage
+- **Web (phase 1):** React 19 + TypeScript (Vite), browser localStorage; Vitest + React Testing Library,
+  Cucumber.js, oxlint, Prettier. Node version in `web/.nvmrc`.
 - **Backend (phase 2+):** Java, Spring Boot
 
-Build, test and lint commands will be added here once the project is scaffolded.
+## Commands
+
+Run in `web/`, after `nvm use` and `npm install`:
+
+| Command | What |
+|---|---|
+| `npm run check` | Lint, format check, type check, build, tests and specs; must pass for every commit |
+| `npm test` | Vitest in watch mode |
+| `npm run test:specs` | Shared Gherkin specs; scenarios with undefined steps are listed, not failed |
+| `npx cucumber-js` | Specs with snippets for undefined steps |
+| `npm run format` | Format with Prettier |
+| `npm run dev` | Dev server |
+
+Verify every commit of a branch before opening a PR (from the repo root; commits without `web/package.json` are skipped):
+
+```sh
+git rebase --exec '[ ! -f web/package.json ] || (cd web && npm ci && npm run check)' main
+```
 
 ## Design rules (keep sync possible)
 
