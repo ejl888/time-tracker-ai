@@ -6,6 +6,8 @@ See [docs/roadmap.md](docs/roadmap.md) for phases and design decisions.
 ## How we work
 
 - **Ask before acting.** Propose a plan and wait for approval before changing files or running commands that change state.
+- **Ask questions in one go.** When the owner raises a new topic, ask all clarifying questions at once, each with a
+  recommendation, instead of one at a time. Questions that only come up later during the work are still fine.
 - **Explain each step.** The owner is learning how Claude Code works: say briefly what you do and why.
 - **One branch per feature.** Never commit directly to `main`. Every feature gets a branch (`feature/<short-name>`) and a pull request on GitHub.
 - **Conventional Commits.** Format: `<type>(<optional scope>): <summary>`.
