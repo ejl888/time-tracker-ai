@@ -24,7 +24,8 @@ Every story follows these steps; the owner approves steps 2 and 3 before code is
 
 1. **Story:** pick a user story from [docs/requirements.md](docs/requirements.md) (e.g. US-08).
 2. **Spec:** write Given/When/Then scenarios in `specs/*.feature`, referencing the story ID.
-   Commit them first as `test(spec): …`; scenarios without step definitions report as pending, so the build stays green.
+   Commit them first as `test(spec): …`; scenarios without step definitions report as
+   "not implemented yet" and do not fail the build; failed or ambiguous steps do.
 3. **Plan:** propose the technical design and task list (plan mode).
 4. **TDD per scenario:** failing test → make it pass → refactor, then commit test and code together.
 5. **Review and PR.**
