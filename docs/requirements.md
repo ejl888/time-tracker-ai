@@ -108,6 +108,7 @@ _Priority: **Must** (first version), **Should** (soon after), **Could** (later).
 | US-20 | As a user, I want to add a new contract when my contract or client changes, with its own billing cycle, limit and starting balance, so that each contract has its own balance. | Should |
 | US-21 | As a user, I want to move an entry to another day by dragging it, so that I can fix an entry logged on the wrong day. | Could |
 | US-22 | As a user, I want the next entry's start time to follow when I change an entry's end time (and the previous entry's end time to follow when I change a start time), so that adjacent entries stay adjacent without editing both. | Should |
+| US-23 | As a user, I want to create a new label by typing a name that doesn't exist yet in the label field and confirming it, billable by default and optionally marked non-billable in the confirmation, so that I can log an entry with a new label without leaving the entry row. | Should |
 
 ### Rules
 
@@ -123,6 +124,8 @@ _Priority: **Must** (first version), **Should** (soon after), **Could** (later).
 - Every entry needs a label; the description is optional.
 - A label's billable setting cannot be changed once an entry (not deleted) uses it, so earlier periods never change.
   Create a new label instead. Renaming a label is always allowed.
+- Label names are trimmed (spaces at the start and end are removed) and unique, ignoring upper and lower case.
+  A deleted label's name can be used again.
 
 #### Entering time
 
@@ -132,6 +135,9 @@ _Priority: **Must** (first version), **Should** (soon after), **Could** (later).
 - The end time starts equal to the start time; the app only reports "end must be after start" once the end time was
   changed or on save.
 - Enter saves, Esc cancels. After saving a new entry the next empty row opens with the cursor on the end time.
+- New label (US-23): when the typed label matches no existing label, the suggestions offer "Create label …".
+  A confirmation shows the name and a billable checkbox (checked by default). Cancelling creates nothing and
+  keeps the typed text in the label field.
 - Linked times (US-22): when I change an entry's end time and the next entry started exactly at the old end time, that
   entry's start time moves along; when I change a start time, the previous entry's end time follows the same way.
   Only the directly adjacent entry changes; entries after a gap are left alone. If the adjacent entry would end up
