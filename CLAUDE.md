@@ -19,6 +19,12 @@ See [docs/roadmap.md](docs/roadmap.md) for phases and design decisions.
   Clean up branch history (fold WIP and fixup commits) before merging.
 - **Small vertical slices.** Each feature is usable end to end (UI + storage + tests) before starting the next.
 - **No AI features in the app itself.**
+- **Park unrelated topics.** When the owner raises a topic that does not affect the current branch, create a GitHub
+  issue with the `idea` label (title, context, questions raised so far) and continue the current work.
+  Decisions from a parked issue get their own branch and PR, never a commit on an unrelated branch.
+- **Pick up parked topics between PRs.** After each merge, list the open `idea` issues so the owner chooses what's next.
+- **Scope check before a PR.** List the branch's commits and flag any that don't fit the PR's purpose;
+  move those to their own branch before opening the PR.
 
 ## Spec-driven development (BDD / TDD)
 
