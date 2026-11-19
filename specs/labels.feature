@@ -1,7 +1,8 @@
-# Stories: US-04
+# Stories: US-04, US-23
 Feature: Labels
   Each label is billable or non-billable. Once a label is used, its billable setting is fixed, so that
-  worked hours and balances of earlier periods never change afterwards.
+  worked hours and balances of earlier periods never change afterwards. Label names are unique, ignoring
+  case and spaces around the name.
 
   Background:
     Given today is 2026-11-18
@@ -27,4 +28,32 @@ Feature: Labels
     Given an entry on 2026-11-18 from 09:00 to 10:00 labelled Support
     And I delete that entry
     When I mark Support as non-billable
+    Then Support is non-billable
+
+  Scenario: A new label is billable by default
+    When I create a label Travel
+    Then Travel is billable
+
+  Scenario: A new label can be created non-billable
+    When I create a non-billable label Lunch
+    Then Lunch is non-billable
+
+  Scenario: Spaces around a label name are removed
+    When I create a label "  Travel  "
+    Then there is 1 label named Travel
+
+  Scenario: Label names are unique, ignoring case and spaces
+    When I create a label " support "
+    Then the label is rejected
+    And there is 1 label named Support
+
+  Scenario: A label cannot be renamed to an existing name
+    Given a billable label Meeting
+    When I rename Meeting to SUPPORT
+    Then the change is rejected
+    And Meeting keeps its name
+
+  Scenario: The name of a deleted label can be used again
+    Given I delete the label Support
+    When I create a non-billable label Support
     Then Support is non-billable
