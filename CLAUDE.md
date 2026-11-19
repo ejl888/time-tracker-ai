@@ -47,6 +47,19 @@ Rules:
 - **UI details** (e.g. autocomplete) are tested with plain Vitest + React Testing Library.
 - `specs/` lives at the repo root, not inside an app, because all apps share it.
 
+## Agents
+
+Subagents are defined in `.claude/agents/`. The main session coordinates: it plans with the owner, hands out work,
+shows the results and makes the commits. Agents never commit.
+
+- **tester** writes the failing test for one scenario or UI behaviour (step definitions or Vitest).
+- **frontend** makes it pass and refactors, without changing specs or tests.
+- **reviewer** reviews the branch before every PR and changes nothing.
+
+In the TDD step every scenario goes tester → frontend; the reviewer runs before every PR. Small changes (docs,
+one-line fixes) are done directly. Planning (step 3) happens in plan mode with the owner, not in an agent.
+A backend agent follows in phase 2.
+
 ## Stack
 
 - **Web (phase 1):** React 19 + TypeScript (Vite), browser localStorage; Vitest + React Testing Library,
