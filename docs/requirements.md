@@ -114,7 +114,7 @@ _Priority: **Must** (first version), **Should** (soon after), **Could** (later).
 
 - Times use the 24-hour clock and are entered in quarter-hour steps (e.g. 08:45); other minutes are still allowed.
 - Durations are shown as hours and minutes (e.g. `7:30`); no extra rounding.
-- An entry cannot run past midnight; split it into two entries.
+- An entry cannot run past midnight; split it into two entries. Ending at exactly midnight is allowed (shown as `24:00`).
 - The app warns when entries on the same day overlap. Gaps between entries are allowed.
 - Hours left to work = billed hours − worked hours in the current period. The balance is shown separately.
 - Billed hours are not shown separately; when the expected billable hours exceed the limit, a note says they are capped.
