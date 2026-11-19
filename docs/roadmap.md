@@ -33,7 +33,7 @@ Track working time in a web app and a mobile app that stay in sync, replacing th
 | 2 | Data access behind a repository interface | Swap localStorage for the API in phase 2 without touching the UI |
 | 3 | Client-generated UUIDs | Web and mobile can create records offline without ID conflicts |
 | 4 | `createdAt`, `updatedAt`, `deleted` on every record | Needed to detect changes and to sync deletions |
-| 5 | Store times in UTC (ISO 8601) | Avoid time zone bugs between devices |
+| 5 | Store moments in UTC (ISO 8601); time entries also store their IANA time zone and are shown in it | UTC avoids time zone bugs between devices and maps to Java `Instant`; the stored zone keeps entry times from shifting when travelling |
 | 6 | No AI features in the app | Owner's choice; AI is used to build the app, not inside it |
 | 7 | Branch and PR per feature | Reviewable history; every change is approved |
 | 8 | Conventional Commits | Consistent, scannable history; enables changelog tooling later |

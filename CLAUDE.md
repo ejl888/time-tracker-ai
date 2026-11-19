@@ -51,5 +51,6 @@ Build, test and lint commands will be added here once the project is scaffolded.
 - Components never call `localStorage` directly; all data access goes through a repository interface.
 - IDs are UUIDs generated on the client.
 - Every record has `createdAt`, `updatedAt` and `deleted` (soft delete).
-- Times are stored in UTC (ISO 8601) and converted to local time only for display.
+- Moments are stored in UTC (ISO 8601). Time entries also store the IANA time zone they were entered in and are
+  shown in that zone. Durations are whole minutes. See [docs/data-model.md](docs/data-model.md).
 - The data model in `docs/` is the contract; update it in the same PR as any model change.
