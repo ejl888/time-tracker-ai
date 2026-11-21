@@ -72,6 +72,7 @@ export function LabelsPage({ labels }: { labels: LabelService }) {
               setBillable={(newBillable) =>
                 apply(labels.setBillable(label.id, newBillable))
               }
+              remove={() => apply(labels.remove(label.id))}
             />
           ))}
         </ul>
