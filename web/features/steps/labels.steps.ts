@@ -59,3 +59,43 @@ Then(
     )
   },
 )
+
+/** The id of the non-deleted label with this name; fails the step if there is none. */
+async function labelId(world: TimetrackerWorld, name: string): Promise<string> {
+  const label = await world.findLabel(name)
+  assert.ok(label, `no label named ${name}`)
+  return label.id
+}
+
+When(
+  'I mark {name} as non-billable',
+  async function (this: TimetrackerWorld, name: string) {
+    const id = await labelId(this, name)
+    this.lastResult = await this.labelService.setBillable(id, false)
+  },
+)
+
+When(
+  'I rename {name} to {name}',
+  async function (this: TimetrackerWorld, name: string, newName: string) {
+    const id = await labelId(this, name)
+    this.lastResult = await this.labelService.rename(id, newName)
+  },
+)
+
+Then('the change is rejected', function (this: TimetrackerWorld) {
+  assert.ok(this.lastResult, 'no change was made')
+  assert.equal(this.lastResult.ok, false, 'the change was accepted')
+})
+
+Then(
+  '{name} keeps its name',
+  async function (this: TimetrackerWorld, name: string) {
+    const label = await this.findLabel(name)
+    const labels = await this.labelService.list()
+    assert.ok(
+      label,
+      `no label named ${name}; labels: ${JSON.stringify(labels.map((l) => l.name))}`,
+    )
+  },
+)
