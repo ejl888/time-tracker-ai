@@ -99,3 +99,12 @@ Then(
     )
   },
 )
+
+Given(
+  'I delete the label {name}',
+  async function (this: TimetrackerWorld, name: string) {
+    const id = await labelId(this, name)
+    const result = await this.labelService.remove(id)
+    assert.ok(result.ok, `could not delete ${name}: ${JSON.stringify(result)}`)
+  },
+)
