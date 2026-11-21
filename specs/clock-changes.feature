@@ -24,3 +24,11 @@ Feature: Entries on the nights the clocks change
   Scenario: A time that occurs twice is the earlier one
     Given an entry on 2026-10-25 from 02:30 to 03:30 labelled Project
     Then the duration of that entry is 2:00
+
+  Scenario: An end time that does not exist moves forward by the gap
+    Given an entry on 2026-03-29 from 01:00 to 02:30 labelled Project
+    Then the duration of that entry is 1:30
+
+  Scenario: An end time that occurs twice is the earlier one
+    Given an entry on 2026-10-25 from 01:00 to 02:30 labelled Project
+    Then the duration of that entry is 1:30
