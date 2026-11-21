@@ -7,6 +7,12 @@ import { newRecordFields, touch } from './recordFields.ts'
 export type LabelError =
   'empty-name' | 'duplicate-name' | 'label-in-use' | 'not-found'
 
+/** A listed label with whether an entry that is not deleted uses it. */
+export interface ListedLabel {
+  label: Label
+  used: boolean
+}
+
 export interface CreateLabelOptions {
   billable?: boolean
 }
@@ -41,10 +47,23 @@ export function createLabelService(
     return label && !label.deleted ? label : undefined
   }
 
+  /** The ids of the labels that entries that are not deleted use. */
+  async function usedLabelIds(): Promise<Set<string>> {
+    const all = await entries.all()
+    return new Set(
+      all.filter((entry) => !entry.deleted).map((entry) => entry.labelId),
+    )
+  }
+
   /** Whether an entry that is not deleted uses the label. */
   async function isUsed(id: string): Promise<boolean> {
-    const all = await entries.all()
-    return all.some((entry) => !entry.deleted && entry.labelId === id)
+    return (await usedLabelIds()).has(id)
+  }
+
+  /** Labels that are not deleted, sorted by name. */
+  async function list(): Promise<Label[]> {
+    const existing = await active()
+    return existing.sort((a, b) => a.name.localeCompare(b.name))
   }
 
   /**
@@ -83,10 +102,12 @@ export function createLabelService(
   }
 
   return {
-    /** Labels that are not deleted, sorted by name. */
-    async list(): Promise<Label[]> {
-      const existing = await active()
-      return existing.sort((a, b) => a.name.localeCompare(b.name))
+    list,
+
+    /** Like `list`, with whether entries use each label. */
+    async listWithUsage(): Promise<ListedLabel[]> {
+      const [listed, used] = await Promise.all([list(), usedLabelIds()])
+      return listed.map((label) => ({ label, used: used.has(label.id) }))
     },
 
     async create(
@@ -132,8 +153,6 @@ export function createLabelService(
     remove(id: string): Promise<Result<Label, LabelError>> {
       return update(id, { deleted: true })
     },
-
-    isUsed,
   }
 }
 

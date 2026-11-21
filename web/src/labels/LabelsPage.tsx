@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import type { LabelError, LabelService } from '../domain/labels.ts'
+import type { LabelError, LabelService, ListedLabel } from '../domain/labels.ts'
 import { normalizeName } from '../domain/labels.ts'
 import type { Label } from '../domain/records.ts'
+import type { Result } from '../domain/result.ts'
+import { LabelRow } from './LabelRow.tsx'
 
 /** The text shown to the user for a rejected label action. */
 function errorMessage(error: LabelError, name: string): string {
@@ -19,14 +21,14 @@ function errorMessage(error: LabelError, name: string): string {
 }
 
 export function LabelsPage({ labels }: { labels: LabelService }) {
-  const [list, setList] = useState<Label[]>([])
+  const [list, setList] = useState<ListedLabel[]>([])
   const [name, setName] = useState('')
   const [billable, setBillable] = useState(true)
   const [message, setMessage] = useState<string>()
 
   useEffect(() => {
     let current = true
-    void labels.list().then((loaded) => {
+    void labels.listWithUsage().then((loaded) => {
       if (current) setList(loaded)
     })
     return () => {
@@ -34,13 +36,18 @@ export function LabelsPage({ labels }: { labels: LabelService }) {
     }
   }, [labels])
 
-  async function reload() {
-    setList(await labels.list())
+  /** Waits for an action and reloads the list when it succeeds. */
+  async function apply(
+    action: Promise<Result<Label, LabelError>>,
+  ): Promise<Result<Label, LabelError>> {
+    const result = await action
+    if (result.ok) setList(await labels.listWithUsage())
+    return result
   }
 
   async function add(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const result = await labels.create(name, { billable })
+    const result = await apply(labels.create(name, { billable }))
     if (!result.ok) {
       setMessage(errorMessage(result.error, name))
       return
@@ -48,7 +55,6 @@ export function LabelsPage({ labels }: { labels: LabelService }) {
     setMessage(undefined)
     setName('')
     setBillable(true)
-    await reload()
   }
 
   return (
@@ -56,14 +62,17 @@ export function LabelsPage({ labels }: { labels: LabelService }) {
       <h2>Labels</h2>
       {list.length > 0 && (
         <ul>
-          {list.map((label) => (
-            <li key={label.id}>
-              <input aria-label="Label name" value={label.name} readOnly />
-              <label>
-                <input type="checkbox" checked={label.billable} readOnly />
-                Billable
-              </label>
-            </li>
+          {list.map(({ label, used }) => (
+            <LabelRow
+              key={label.id}
+              label={label}
+              used={used}
+              describe={errorMessage}
+              rename={(newName) => apply(labels.rename(label.id, newName))}
+              setBillable={(newBillable) =>
+                apply(labels.setBillable(label.id, newBillable))
+              }
+            />
           ))}
         </ul>
       )}
