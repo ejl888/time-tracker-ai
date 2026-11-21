@@ -41,3 +41,21 @@ Then(
     assert.equal(label.billable, false)
   },
 )
+
+Then('the label is rejected', function (this: TimetrackerWorld) {
+  assert.ok(this.lastResult, 'no label was created')
+  assert.equal(this.lastResult.ok, false, 'the label was accepted')
+})
+
+Then(
+  'there is {int} label(s) named {name}',
+  async function (this: TimetrackerWorld, count: number, name: string) {
+    const labels = await this.labelService.list()
+    const names = labels.map((label) => label.name)
+    assert.equal(
+      names.filter((n) => n === name).length,
+      count,
+      `labels: ${JSON.stringify(names)}`,
+    )
+  },
+)

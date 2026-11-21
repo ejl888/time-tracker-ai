@@ -33,7 +33,7 @@ Every record has:
 
 | Field | Type | Notes |
 |---|---|---|
-| `name` | string | Trimmed; unique among labels that are not deleted, ignoring case |
+| `name` | string | Trimmed; unique among labels that are not deleted, ignoring case (Unicode lower case, any locale; accents count) |
 | `billable` | boolean | Fixed once an entry that is not deleted uses the label |
 
 ### Entry
