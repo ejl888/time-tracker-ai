@@ -1,4 +1,4 @@
-import type { Temporal } from 'temporal-polyfill'
+import { Temporal } from 'temporal-polyfill'
 import type { Clock } from './clock.ts'
 import type { Entry } from './records.ts'
 import type { Repository } from './repository.ts'
@@ -29,6 +29,18 @@ function instantOf(
   return toInstant(zoned.toInstant())
 }
 
+/** The date of an entry: the local date of its start in its own time zone. */
+export function dateOf(entry: Entry): Temporal.PlainDate {
+  return Temporal.Instant.from(entry.start)
+    .toZonedDateTimeISO(entry.timeZone)
+    .toPlainDate()
+}
+
+/** Whether an entry is not deleted and falls on the date. */
+export function isActiveOn(entry: Entry, date: Temporal.PlainDate): boolean {
+  return !entry.deleted && dateOf(entry).equals(date)
+}
+
 export function createEntryService(entries: Repository<Entry>, clock: Clock) {
   return {
     async add({
@@ -49,6 +61,19 @@ export function createEntryService(entries: Repository<Entry>, clock: Clock) {
       }
       await entries.save(entry)
       return { ok: true, value: entry }
+    },
+
+    /** Entries that are not deleted on the date, sorted by start. */
+    async on(date: Temporal.PlainDate): Promise<Entry[]> {
+      const all = await entries.all()
+      return all
+        .filter((entry) => isActiveOn(entry, date))
+        .sort((a, b) =>
+          Temporal.Instant.compare(
+            Temporal.Instant.from(a.start),
+            Temporal.Instant.from(b.start),
+          ),
+        )
     },
 
     /** Soft-deletes an entry that is not deleted yet. */
