@@ -5,6 +5,7 @@ import { fixedClock } from '../../src/domain/clock.ts'
 import type { Clock } from '../../src/domain/clock.ts'
 import { createEntryService } from '../../src/domain/entries.ts'
 import { createLabelService } from '../../src/domain/labels.ts'
+import type { LabelService } from '../../src/domain/labels.ts'
 import type { Entry, Label } from '../../src/domain/records.ts'
 import { InMemoryRepository } from '../../src/domain/repository.ts'
 import type { Result } from '../../src/domain/result.ts'
@@ -15,7 +16,6 @@ export const ZONE = 'Europe/Amsterdam'
 /** "Today" in the specs is this time of day in ZONE. */
 const TIME_OF_DAY = Temporal.PlainTime.from('12:00')
 
-type LabelService = ReturnType<typeof createLabelService>
 type EntryService = ReturnType<typeof createEntryService>
 
 export class TimetrackerWorld extends World {
