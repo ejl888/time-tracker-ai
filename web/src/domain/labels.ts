@@ -69,7 +69,7 @@ export function createLabelService(
    */
   async function update(
     id: string,
-    changes: Partial<Pick<Label, 'name' | 'billable'>>,
+    changes: Partial<Pick<Label, 'name' | 'billable' | 'deleted'>>,
   ): Promise<Result<Label, LabelError>> {
     const label = await findActive(id)
     if (!label) return { ok: false, error: 'not-found' }
@@ -126,6 +126,11 @@ export function createLabelService(
         return { ok: false, error: 'label-in-use' }
       }
       return update(id, { billable })
+    },
+
+    /** Soft deletes a label; entries that use it keep pointing to it. */
+    remove(id: string): Promise<Result<Label, LabelError>> {
+      return update(id, { deleted: true })
     },
 
     isUsed,
