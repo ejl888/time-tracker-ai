@@ -136,3 +136,5 @@ export function createLabelService(
     isUsed,
   }
 }
+
+export type LabelService = ReturnType<typeof createLabelService>
