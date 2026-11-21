@@ -17,3 +17,10 @@ defineParameterType({
   // Otherwise every word in a snippet for an undefined step becomes {name}.
   useForSnippets: false,
 })
+
+// A wall-clock time such as 09:00.
+defineParameterType({
+  name: 'time',
+  regexp: /\d{2}:\d{2}/,
+  transformer: (text: string) => Temporal.PlainTime.from(text),
+})

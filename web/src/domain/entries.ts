@@ -1,0 +1,63 @@
+import type { Temporal } from 'temporal-polyfill'
+import type { Clock } from './clock.ts'
+import type { Entry } from './records.ts'
+import type { Repository } from './repository.ts'
+import type { Result } from './result.ts'
+import { newRecordFields, toInstant, touch } from './recordFields.ts'
+
+export type EntryError = 'not-found'
+
+export interface NewEntry {
+  date: Temporal.PlainDate
+  start: Temporal.PlainTime
+  end: Temporal.PlainTime
+  labelId: string
+  description: string
+  /** IANA time zone the date and times are in. */
+  timeZone: string
+}
+
+/** The UTC instant of a wall-clock time on a date in a zone; gaps and overlaps resolve as 'compatible'. */
+function instantOf(
+  date: Temporal.PlainDate,
+  time: Temporal.PlainTime,
+  timeZone: string,
+): string {
+  const zoned = date.toPlainDateTime(time).toZonedDateTime(timeZone, {
+    disambiguation: 'compatible',
+  })
+  return toInstant(zoned.toInstant())
+}
+
+export function createEntryService(entries: Repository<Entry>, clock: Clock) {
+  return {
+    async add({
+      date,
+      start,
+      end,
+      labelId,
+      description,
+      timeZone,
+    }: NewEntry): Promise<Result<Entry, EntryError>> {
+      const entry: Entry = {
+        ...newRecordFields(clock),
+        start: instantOf(date, start, timeZone),
+        end: instantOf(date, end, timeZone),
+        timeZone,
+        description,
+        labelId,
+      }
+      await entries.save(entry)
+      return { ok: true, value: entry }
+    },
+
+    /** Soft-deletes an entry that is not deleted yet. */
+    async remove(id: string): Promise<Result<Entry, EntryError>> {
+      const entry = await entries.get(id)
+      if (!entry || entry.deleted) return { ok: false, error: 'not-found' }
+      const removed = touch(entry, { deleted: true }, clock)
+      await entries.save(removed)
+      return { ok: true, value: removed }
+    },
+  }
+}

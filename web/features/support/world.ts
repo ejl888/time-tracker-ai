@@ -3,6 +3,7 @@ import type { IWorldOptions } from '@cucumber/cucumber'
 import { Temporal } from 'temporal-polyfill'
 import { fixedClock } from '../../src/domain/clock.ts'
 import type { Clock } from '../../src/domain/clock.ts'
+import { createEntryService } from '../../src/domain/entries.ts'
 import { createLabelService } from '../../src/domain/labels.ts'
 import type { Entry, Label } from '../../src/domain/records.ts'
 import { InMemoryRepository } from '../../src/domain/repository.ts'
@@ -15,12 +16,17 @@ export const ZONE = 'Europe/Amsterdam'
 const TIME_OF_DAY = Temporal.PlainTime.from('12:00')
 
 type LabelService = ReturnType<typeof createLabelService>
+type EntryService = ReturnType<typeof createEntryService>
 
 export class TimetrackerWorld extends World {
   labels = new InMemoryRepository<Label>()
   entries = new InMemoryRepository<Entry>()
   clock: Clock
   labelService: LabelService
+  /** Shares the entries repository with the label service, so labels see their entries. */
+  entryService: EntryService
+  /** The last entry added: "that entry". */
+  lastEntry: Entry | undefined
   /** The result of the last action that can be rejected. */
   lastResult: Result<unknown, unknown> | undefined
 
@@ -28,6 +34,7 @@ export class TimetrackerWorld extends World {
     super(options)
     this.clock = fixedClock(Temporal.Instant.from('2026-01-01T12:00:00Z'))
     this.labelService = this.buildLabelService()
+    this.entryService = this.buildEntryService()
   }
 
   /** Sets a fixed clock at TIME_OF_DAY on the given date in ZONE. */
@@ -37,6 +44,7 @@ export class TimetrackerWorld extends World {
       .toInstant()
     this.clock = fixedClock(instant)
     this.labelService = this.buildLabelService()
+    this.entryService = this.buildEntryService()
   }
 
   /** The label with this name that is not deleted, if any. */
@@ -47,6 +55,10 @@ export class TimetrackerWorld extends World {
 
   private buildLabelService() {
     return createLabelService(this.labels, this.entries, this.clock)
+  }
+
+  private buildEntryService() {
+    return createEntryService(this.entries, this.clock)
   }
 }
 
