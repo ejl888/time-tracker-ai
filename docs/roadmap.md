@@ -21,7 +21,7 @@ Track working time in a web app and a mobile app that stay in sync, replacing th
 4. ~~Gherkin specs for the Must stories~~ → [specs/](../specs)
 5. ~~Scaffold the web app, `CLAUDE.md` commands, data model, CI, agent definitions~~ → [web/](../web),
    [data-model.md](data-model.md), [.claude/agents/](../.claude/agents)
-6. First story through the full spec → plan → TDD flow, ending in a PR
+6. ~~First story through the full spec → plan → TDD flow, ending in a PR~~ → labels (US-04), PR #13
 7. Deploy to the NAS: Dockerfile, nginx, compose file, reverse proxy and certificate for `timetracker.codeable.nl`
 8. Backend and sync on the NAS, once the Must stories work on the laptop; first choose login or VPN (decision 17)
 
