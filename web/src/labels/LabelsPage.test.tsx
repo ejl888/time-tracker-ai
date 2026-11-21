@@ -1,31 +1,50 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Temporal } from 'temporal-polyfill'
 import { expect, test } from 'vitest'
 import { fixedClock } from '../domain/clock.ts'
+import { createEntryService } from '../domain/entries.ts'
 import { createLabelService } from '../domain/labels.ts'
 import type { Entry, Label } from '../domain/records.ts'
 import { InMemoryRepository } from '../domain/repository.ts'
 import { LabelsPage } from './LabelsPage.tsx'
 
-function labelService() {
-  return createLabelService(
-    new InMemoryRepository<Label>(),
-    new InMemoryRepository<Entry>(),
-    fixedClock(Temporal.Instant.from('2026-11-21T09:00:00Z')),
-  )
-}
+const clock = fixedClock(Temporal.Instant.from('2026-11-21T09:00:00Z'))
 
-async function renderPage(seed: { name: string; billable: boolean }[] = []) {
-  const labels = labelService()
+/**
+ * Renders the page on in-memory services, seeded with these labels.
+ * Labels named in `used` get an entry, so they are in use.
+ */
+async function renderPage(
+  seed: { name: string; billable: boolean }[] = [],
+  used: string[] = [],
+) {
+  const entryRepository = new InMemoryRepository<Entry>()
+  const labels = createLabelService(
+    new InMemoryRepository<Label>(),
+    entryRepository,
+    clock,
+  )
+  const entries = createEntryService(entryRepository, clock)
   for (const { name, billable } of seed) {
-    await labels.create(name, { billable })
+    const created = await labels.create(name, { billable })
+    if (created.ok && used.includes(name)) {
+      await entries.add({
+        date: Temporal.PlainDate.from('2026-11-20'),
+        start: Temporal.PlainTime.from('09:00'),
+        end: Temporal.PlainTime.from('10:00'),
+        labelId: created.value.id,
+        description: 'Work',
+        timeZone: 'Europe/Amsterdam',
+      })
+    }
   }
   render(<LabelsPage labels={labels} />)
   await screen.findByRole('heading', { name: 'Labels' })
   const form = screen.getByRole('form', { name: 'Add label' })
   return {
     user: userEvent.setup(),
+    labels,
     nameField: within(form).getByRole('textbox', { name: 'Name' }),
     billableBox: within(form).getByRole('checkbox', { name: 'Billable' }),
     addButton: within(form).getByRole('button', { name: 'Add' }),
@@ -139,4 +158,197 @@ test('clears the message after a successful add', async () => {
 
   await findLabel('Travel')
   expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+})
+
+/** The list item of the label with this name, once it is listed. */
+async function findItem(name: string) {
+  const field = await findLabel(name)
+  const item = field.closest('li')
+  if (!item) throw new Error(`No list item for ${name}`)
+  return item
+}
+
+/** The names and billable settings of the labels in the service. */
+async function savedLabels(labels: { list(): Promise<Label[]> }) {
+  return (await labels.list()).map(({ name, billable }) => ({ name, billable }))
+}
+
+test('renames a label with Enter', async () => {
+  const { user, labels } = await renderPage([
+    { name: 'Support', billable: true },
+  ])
+  const field = within(await findItem('Support')).getByRole('textbox', {
+    name: 'Label name',
+  })
+
+  await user.clear(field)
+  await user.type(field, 'Helpdesk{Enter}')
+
+  await waitFor(async () =>
+    expect(await savedLabels(labels)).toEqual([
+      { name: 'Helpdesk', billable: true },
+    ]),
+  )
+  await findLabel('Helpdesk')
+  expect(listedLabels()).toEqual([{ name: 'Helpdesk', billable: true }])
+})
+
+test('renames a label when leaving the field', async () => {
+  const { user, labels } = await renderPage([
+    { name: 'Support', billable: true },
+  ])
+  const field = within(await findItem('Support')).getByRole('textbox', {
+    name: 'Label name',
+  })
+
+  await user.clear(field)
+  await user.type(field, 'Helpdesk')
+  await user.tab()
+
+  await waitFor(async () =>
+    expect(await savedLabels(labels)).toEqual([
+      { name: 'Helpdesk', billable: true },
+    ]),
+  )
+  expect(listedLabels()).toEqual([{ name: 'Helpdesk', billable: true }])
+})
+
+test('reverts a rename with Esc and saves nothing', async () => {
+  const { user, labels } = await renderPage([
+    { name: 'Support', billable: true },
+  ])
+  const field = within(await findItem('Support')).getByRole('textbox', {
+    name: 'Label name',
+  })
+
+  await user.clear(field)
+  await user.type(field, 'Helpdesk')
+  expect(field).toHaveValue('Helpdesk')
+  await user.keyboard('{Escape}')
+
+  expect(field).toHaveValue('Support')
+  await user.tab()
+  expect(field).toHaveValue('Support')
+  expect(await savedLabels(labels)).toEqual([
+    { name: 'Support', billable: true },
+  ])
+})
+
+test('rejects a rename to an existing name and shows the saved name again', async () => {
+  const { user, labels } = await renderPage([
+    { name: 'Meeting', billable: true },
+    { name: 'Support', billable: true },
+  ])
+  const field = within(await findItem('Meeting')).getByRole('textbox', {
+    name: 'Label name',
+  })
+
+  await user.clear(field)
+  await user.type(field, 'support{Enter}')
+
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'A label named support already exists',
+  )
+  expect(field).toHaveValue('Meeting')
+  expect(await savedLabels(labels)).toEqual([
+    { name: 'Meeting', billable: true },
+    { name: 'Support', billable: true },
+  ])
+})
+
+test('shows a rejected rename inside that label, not under the add form', async () => {
+  const { user } = await renderPage([
+    { name: 'Meeting', billable: true },
+    { name: 'Support', billable: true },
+  ])
+  const item = await findItem('Meeting')
+  const field = within(item).getByRole('textbox', { name: 'Label name' })
+
+  await user.clear(field)
+  await user.type(field, 'support{Enter}')
+
+  expect(await within(item).findByRole('alert')).toHaveTextContent(
+    'A label named support already exists',
+  )
+  const form = screen.getByRole('form', { name: 'Add label' })
+  expect(within(form).queryByRole('alert')).not.toBeInTheDocument()
+  expect(
+    within(await findItem('Support')).queryByRole('alert'),
+  ).not.toBeInTheDocument()
+})
+
+test('shows a rejected add at the add form, not inside a label', async () => {
+  const { user, nameField, addButton } = await renderPage([
+    { name: 'Support', billable: true },
+  ])
+  await findLabel('Support')
+
+  await user.type(nameField, 'support')
+  await user.click(addButton)
+
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'A label named support already exists',
+  )
+  for (const item of screen.getAllByRole('listitem')) {
+    expect(within(item).queryByRole('alert')).not.toBeInTheDocument()
+  }
+})
+
+test('rejects a rename to an empty name and shows the saved name again', async () => {
+  const { user, labels } = await renderPage([
+    { name: 'Support', billable: true },
+  ])
+  const field = within(await findItem('Support')).getByRole('textbox', {
+    name: 'Label name',
+  })
+
+  await user.clear(field)
+  await user.keyboard('{Enter}')
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('Enter a name')
+  expect(field).toHaveValue('Support')
+  expect(await savedLabels(labels)).toEqual([
+    { name: 'Support', billable: true },
+  ])
+})
+
+test('changes the billable setting of an unused label', async () => {
+  const { user, labels } = await renderPage([
+    { name: 'Support', billable: true },
+  ])
+  const box = within(await findItem('Support')).getByRole('checkbox', {
+    name: 'Billable',
+  })
+
+  await user.click(box)
+
+  await waitFor(async () =>
+    expect(await savedLabels(labels)).toEqual([
+      { name: 'Support', billable: false },
+    ]),
+  )
+  expect(box).not.toBeChecked()
+})
+
+test('locks the billable setting of a used label', async () => {
+  await renderPage(
+    [
+      { name: 'Meeting', billable: true },
+      { name: 'Support', billable: true },
+    ],
+    ['Support'],
+  )
+  const note = 'In use: create a new label to change this'
+
+  const used = await findItem('Support')
+  expect(
+    within(used).getByRole('checkbox', { name: 'Billable' }),
+  ).toBeDisabled()
+  expect(used).toHaveTextContent(note)
+
+  const unused = await findItem('Meeting')
+  expect(
+    within(unused).getByRole('checkbox', { name: 'Billable' }),
+  ).toBeEnabled()
+  expect(unused).not.toHaveTextContent(note)
 })
