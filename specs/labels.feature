@@ -47,6 +47,15 @@ Feature: Labels
     Then the label is rejected
     And there is 1 label named Support
 
+  Scenario: A label name cannot be empty
+    When I create a label "   "
+    Then the label is rejected
+
+  Scenario: A label cannot be renamed to an empty name
+    When I rename Support to "   "
+    Then the change is rejected
+    And Support keeps its name
+
   Scenario: A label cannot be renamed to an existing name
     Given a billable label Meeting
     When I rename Meeting to SUPPORT
