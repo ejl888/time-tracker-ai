@@ -47,6 +47,16 @@ Feature: Labels
     Then the label is rejected
     And there is 1 label named Support
 
+  Scenario: Accents count in label names
+    Given a billable label Cafe
+    When I create a label Café
+    Then there is 1 label named Café
+    And there is 1 label named Cafe
+
+  Scenario: A label can be renamed to its own name in other capitals
+    When I rename Support to SUPPORT
+    Then there is 1 label named SUPPORT
+
   Scenario: A label name cannot be empty
     When I create a label "   "
     Then the label is rejected
