@@ -2,8 +2,10 @@ import type { Clock } from './clock.ts'
 import type { Entry, Label } from './records.ts'
 import type { Repository } from './repository.ts'
 import type { Result } from './result.ts'
+import { newRecordFields, touch } from './recordFields.ts'
 
-export type LabelError = 'empty-name' | 'duplicate-name' | 'not-found'
+export type LabelError =
+  'empty-name' | 'duplicate-name' | 'label-in-use' | 'not-found'
 
 export interface CreateLabelOptions {
   billable?: boolean
@@ -24,7 +26,7 @@ export function sameName(a: string, b: string): boolean {
 
 export function createLabelService(
   labels: Repository<Label>,
-  _entries: Repository<Entry>,
+  entries: Repository<Entry>,
   clock: Clock,
 ) {
   /** Labels that are not deleted. */
@@ -39,9 +41,10 @@ export function createLabelService(
     return label && !label.deleted ? label : undefined
   }
 
-  /** The current moment as an ISO 8601 UTC string. */
-  function timestamp(): string {
-    return clock.now().toString({ smallestUnit: 'millisecond' })
+  /** Whether an entry that is not deleted uses the label. */
+  async function isUsed(id: string): Promise<boolean> {
+    const all = await entries.all()
+    return all.some((entry) => !entry.deleted && entry.labelId === id)
   }
 
   /**
@@ -74,7 +77,7 @@ export function createLabelService(
       (key) => changes[key] === label[key],
     )
     if (unchanged) return { ok: true, value: label }
-    const updated: Label = { ...label, ...changes, updatedAt: timestamp() }
+    const updated = touch(label, changes, clock)
     await labels.save(updated)
     return { ok: true, value: updated }
   }
@@ -93,12 +96,8 @@ export function createLabelService(
       const name = normalizeName(rawName)
       const error = await validateName(name)
       if (error) return { ok: false, error }
-      const now = timestamp()
       const label: Label = {
-        id: crypto.randomUUID(),
-        createdAt: now,
-        updatedAt: now,
-        deleted: false,
+        ...newRecordFields(clock),
         name,
         billable,
       }
@@ -121,7 +120,14 @@ export function createLabelService(
       id: string,
       billable: boolean,
     ): Promise<Result<Label, LabelError>> {
+      const label = await findActive(id)
+      if (!label) return { ok: false, error: 'not-found' }
+      if (label.billable !== billable && (await isUsed(id))) {
+        return { ok: false, error: 'label-in-use' }
+      }
       return update(id, { billable })
     },
+
+    isUsed,
   }
 }
