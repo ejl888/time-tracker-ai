@@ -13,6 +13,7 @@ interface LabelRowProps {
   describe: (error: LabelError, name: string) => string
   rename: (name: string) => Promise<LabelResult>
   setBillable: (billable: boolean) => Promise<LabelResult>
+  remove: () => Promise<LabelResult>
 }
 
 /**
@@ -25,6 +26,7 @@ export function LabelRow({
   describe,
   rename,
   setBillable,
+  remove,
 }: LabelRowProps) {
   const [draft, setDraft] = useState(label.name)
   const [message, setMessage] = useState<string>()
@@ -51,6 +53,12 @@ export function LabelRow({
     if (event.key === 'Escape') setDraft(label.name)
   }
 
+  function confirmRemove() {
+    if (window.confirm(`Delete label ${label.name}?`)) {
+      void run(remove(), label.name)
+    }
+  }
+
   return (
     <li>
       <input
@@ -71,6 +79,9 @@ export function LabelRow({
         Billable
       </label>
       {used && <span>In use: create a new label to change this</span>}
+      <button type="button" onClick={confirmRemove}>
+        Delete
+      </button>
       {message && (
         <p id={messageId} role="alert">
           {message}

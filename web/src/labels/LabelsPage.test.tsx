@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Temporal } from 'temporal-polyfill'
-import { expect, test } from 'vitest'
+import { afterEach, expect, test, vi } from 'vitest'
 import { fixedClock } from '../domain/clock.ts'
 import { createEntryService } from '../domain/entries.ts'
 import { createLabelService } from '../domain/labels.ts'
@@ -351,4 +351,63 @@ test('locks the billable setting of a used label', async () => {
     within(unused).getByRole('checkbox', { name: 'Billable' }),
   ).toBeEnabled()
   expect(unused).not.toHaveTextContent(note)
+})
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
+/** Clicks Delete on the label with this name, answering the confirmation. */
+async function deleteLabel(
+  user: ReturnType<typeof userEvent.setup>,
+  name: string,
+  confirmed: boolean,
+) {
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(confirmed)
+  const item = await findItem(name)
+  await user.click(within(item).getByRole('button', { name: 'Delete' }))
+  return confirm
+}
+
+test('deletes a label after confirmation', async () => {
+  const { user, labels } = await renderPage([
+    { name: 'Meeting', billable: true },
+    { name: 'Support', billable: true },
+  ])
+
+  const confirm = await deleteLabel(user, 'Support', true)
+
+  expect(confirm).toHaveBeenCalledWith('Delete label Support?')
+  await waitFor(() =>
+    expect(listedLabels()).toEqual([{ name: 'Meeting', billable: true }]),
+  )
+  expect(await savedLabels(labels)).toEqual([
+    { name: 'Meeting', billable: true },
+  ])
+})
+
+test('keeps the label when the deletion is cancelled', async () => {
+  const { user, labels } = await renderPage([
+    { name: 'Support', billable: true },
+  ])
+
+  const confirm = await deleteLabel(user, 'Support', false)
+
+  expect(confirm).toHaveBeenCalledWith('Delete label Support?')
+  expect(listedLabels()).toEqual([{ name: 'Support', billable: true }])
+  expect(await savedLabels(labels)).toEqual([
+    { name: 'Support', billable: true },
+  ])
+})
+
+test('deletes a used label after confirmation', async () => {
+  const { user, labels } = await renderPage(
+    [{ name: 'Support', billable: true }],
+    ['Support'],
+  )
+
+  await deleteLabel(user, 'Support', true)
+
+  await waitFor(() => expect(listedLabels()).toEqual([]))
+  expect(await savedLabels(labels)).toEqual([])
 })
