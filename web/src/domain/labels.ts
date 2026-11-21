@@ -3,7 +3,7 @@ import type { Entry, Label } from './records.ts'
 import type { Repository } from './repository.ts'
 import type { Result } from './result.ts'
 
-export type LabelError = 'empty-name' | 'duplicate-name'
+export type LabelError = 'empty-name' | 'duplicate-name' | 'not-found'
 
 export interface CreateLabelOptions {
   billable?: boolean
@@ -33,12 +33,50 @@ export function createLabelService(
     return all.filter((label) => !label.deleted)
   }
 
-  /** Checks a normalized name against the label name rules. */
-  async function validateName(name: string): Promise<LabelError | undefined> {
+  /** The non-deleted label with this id, if any. */
+  async function findActive(id: string): Promise<Label | undefined> {
+    const label = await labels.get(id)
+    return label && !label.deleted ? label : undefined
+  }
+
+  /** The current moment as an ISO 8601 UTC string. */
+  function timestamp(): string {
+    return clock.now().toString({ smallestUnit: 'millisecond' })
+  }
+
+  /**
+   * Checks a normalized name against the label name rules.
+   * The label with `exceptId` is ignored, so a label may keep its own name.
+   */
+  async function validateName(
+    name: string,
+    exceptId?: string,
+  ): Promise<LabelError | undefined> {
     if (name === '') return 'empty-name'
     const existing = await active()
-    const taken = existing.some((label) => sameName(label.name, name))
+    const taken = existing.some(
+      (label) => label.id !== exceptId && sameName(label.name, name),
+    )
     return taken ? 'duplicate-name' : undefined
+  }
+
+  /**
+   * Applies changes to an active label and saves it with a new `updatedAt`.
+   * Changes that equal the stored values are not saved.
+   */
+  async function update(
+    id: string,
+    changes: Partial<Pick<Label, 'name' | 'billable'>>,
+  ): Promise<Result<Label, LabelError>> {
+    const label = await findActive(id)
+    if (!label) return { ok: false, error: 'not-found' }
+    const unchanged = (Object.keys(changes) as (keyof typeof changes)[]).every(
+      (key) => changes[key] === label[key],
+    )
+    if (unchanged) return { ok: true, value: label }
+    const updated: Label = { ...label, ...changes, updatedAt: timestamp() }
+    await labels.save(updated)
+    return { ok: true, value: updated }
   }
 
   return {
@@ -55,7 +93,7 @@ export function createLabelService(
       const name = normalizeName(rawName)
       const error = await validateName(name)
       if (error) return { ok: false, error }
-      const now = clock.now().toString({ smallestUnit: 'millisecond' })
+      const now = timestamp()
       const label: Label = {
         id: crypto.randomUUID(),
         createdAt: now,
@@ -66,6 +104,24 @@ export function createLabelService(
       }
       await labels.save(label)
       return { ok: true, value: label }
+    },
+
+    async rename(
+      id: string,
+      rawName: string,
+    ): Promise<Result<Label, LabelError>> {
+      if (!(await findActive(id))) return { ok: false, error: 'not-found' }
+      const name = normalizeName(rawName)
+      const error = await validateName(name, id)
+      if (error) return { ok: false, error }
+      return update(id, { name })
+    },
+
+    async setBillable(
+      id: string,
+      billable: boolean,
+    ): Promise<Result<Label, LabelError>> {
+      return update(id, { billable })
     },
   }
 }
