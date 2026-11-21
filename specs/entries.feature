@@ -23,6 +23,11 @@ Feature: Adding, editing and deleting time entries
       | 10:00 | 10:00 | zero duration             |
       | 22:00 | 00:30 | would run past midnight   |
 
+  Scenario: An entry can end at midnight
+    When I add an entry on 2026-11-18 from 22:00 to 24:00 labelled Project
+    Then the entry is saved
+    And the duration of that entry is 2:00
+
   Scenario: A label is required
     When I add an entry on 2026-11-18 from 09:00 to 10:00 without a label
     Then the entry is rejected
