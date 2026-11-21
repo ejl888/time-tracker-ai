@@ -36,6 +36,20 @@ export function dateOf(entry: Entry): Temporal.PlainDate {
     .toPlainDate()
 }
 
+/** The duration of an entry in whole minutes, between its start and end instants. */
+export function durationOf(entry: Entry): number {
+  return Temporal.Instant.from(entry.start)
+    .until(Temporal.Instant.from(entry.end))
+    .total('minutes')
+}
+
+/** The start of an entry as a wall-clock time in its own time zone. */
+export function startTimeOf(entry: Entry): Temporal.PlainTime {
+  return Temporal.Instant.from(entry.start)
+    .toZonedDateTimeISO(entry.timeZone)
+    .toPlainTime()
+}
+
 /** Whether an entry is not deleted and falls on the date. */
 export function isActiveOn(entry: Entry, date: Temporal.PlainDate): boolean {
   return !entry.deleted && dateOf(entry).equals(date)

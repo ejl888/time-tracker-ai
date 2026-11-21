@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { Given, Then, When } from '@cucumber/cucumber'
 import type { Temporal } from 'temporal-polyfill'
+import { durationOf, startTimeOf } from '../../src/domain/entries.ts'
+import { formatMinutes } from '../../src/domain/workedHours.ts'
 import { ZONE } from '../support/world.ts'
 import type { TimetrackerWorld } from '../support/world.ts'
 
@@ -47,5 +49,25 @@ Then(
     const label = await this.labels.get(entries[0].labelId)
     assert.ok(label, `no label with id ${entries[0].labelId}`)
     assert.equal(label.name, name)
+  },
+)
+
+Then(
+  'the duration of that entry is {duration}',
+  function (this: TimetrackerWorld, duration: string) {
+    assert.ok(this.lastEntry, 'there is no entry yet')
+    assert.equal(formatMinutes(durationOf(this.lastEntry)), duration)
+  },
+)
+
+Then(
+  'that entry starts at {time}',
+  function (this: TimetrackerWorld, time: Temporal.PlainTime) {
+    assert.ok(this.lastEntry, 'there is no entry yet')
+    const start = startTimeOf(this.lastEntry)
+    assert.ok(
+      start.equals(time),
+      `that entry starts at ${start.toString()}, expected ${time.toString()}`,
+    )
   },
 )
