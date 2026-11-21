@@ -126,6 +126,9 @@ _Priority: **Must** (first version), **Should** (soon after), **Could** (later).
   Create a new label instead. Renaming a label is always allowed.
 - Label names are trimmed (spaces at the start and end are removed) and unique, ignoring upper and lower case.
   A deleted label's name can be used again.
+- Label names cannot be empty.
+- Deleting a label asks for confirmation. A deleted label keeps its billable setting and stays on the entries that use
+  it, shown as e.g. "Support (deleted)"; it can no longer be picked for new entries.
 
 #### Entering time
 
