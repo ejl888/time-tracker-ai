@@ -44,3 +44,10 @@ Feature: Prefilled start and end time of a new entry
     When I delete the entry on 2026-11-18
     And I start a new entry on 2026-11-18
     Then the start time is 08:00
+
+  Scenario: When the day already ends at midnight, nothing is prefilled
+    Given these entries on 2026-11-18:
+      | start | end   |
+      | 22:00 | 24:00 |
+    When I start a new entry on 2026-11-18
+    Then nothing is prefilled
