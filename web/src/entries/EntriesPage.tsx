@@ -8,6 +8,7 @@ import type { Entry, Label } from '../domain/records.ts'
 import { formatMinutes, workedMinutesOn } from '../domain/workedHours.ts'
 import { AddEntryRow } from './AddEntryRow.tsx'
 import { EntryRow } from './EntryRow.tsx'
+import './entries.css'
 
 interface EntriesPageProps {
   entries: EntryService
@@ -77,24 +78,36 @@ export function EntriesPage({
   const shown = day?.date.equals(date) ? day : undefined
 
   return (
-    <section>
-      <h2>Entries</h2>
-      <h3>{formatDateHeading(date)}</h3>
-      <button type="button" onClick={() => setDate(date.subtract({ days: 1 }))}>
-        Previous day
-      </button>
-      <button
-        type="button"
-        disabled={isToday}
-        onClick={() => setDate(date.add({ days: 1 }))}
-      >
-        Next day
-      </button>
-      <button type="button" onClick={() => setDate(today)}>
-        Today
-      </button>
+    <section className="entries-page">
+      <h2 className="page-title">Entries</h2>
+      <div className="period-bar">
+        <div className="period-nav">
+          <button
+            className="icon-btn"
+            type="button"
+            aria-label="Previous day"
+            onClick={() => setDate(date.subtract({ days: 1 }))}
+          >
+            ‹
+          </button>
+          <h3 className="period-title">{formatDateHeading(date)}</h3>
+          <button
+            className="icon-btn"
+            type="button"
+            aria-label="Next day"
+            disabled={isToday}
+            onClick={() => setDate(date.add({ days: 1 }))}
+          >
+            ›
+          </button>
+        </div>
+        <span className="spacer" />
+        <button className="btn" type="button" onClick={() => setDate(today)}>
+          Today
+        </button>
+      </div>
       {shown && (
-        <>
+        <div className="day active">
           <DayEntries
             day={shown}
             entries={entries}
@@ -107,7 +120,7 @@ export function EntriesPage({
             timeZone={timeZone}
             onAdded={() => void reload()}
           />
-        </>
+        </div>
       )}
     </section>
   )
@@ -128,12 +141,18 @@ function DayEntries({ day, entries, onChanged }: DayEntriesProps) {
 
   return (
     <>
-      <p>{`Worked ${formatMinutes(worked)}`}</p>
-      {overlaps(day.entries) && <p role="status">Some entries overlap</p>}
+      <div className="day-head">
+        <p className="day-total num">{`Worked ${formatMinutes(worked)}`}</p>
+      </div>
+      {overlaps(day.entries) && (
+        <p className="msg warn" role="status">
+          Some entries overlap
+        </p>
+      )}
       {day.entries.length === 0 ? (
-        <p>No entries</p>
+        <p className="empty-day">No entries</p>
       ) : (
-        <ul aria-label="Entries">
+        <ul className="entries" aria-label="Entries">
           {day.entries.map((entry) => (
             <EntryRow
               // A saved change gives the row a new key, so its fields show the saved values.

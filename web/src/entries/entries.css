@@ -1,0 +1,127 @@
+/* Entries screen, from the Log view and inline editor in docs/prototype/index.html. */
+.entries-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/* Not in the prototype: keeps the "Entries" heading visible as a caption. */
+.page-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin: 0;
+}
+
+.period-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.period-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.period-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 20px;
+  margin: 0;
+  text-wrap: balance;
+}
+.spacer {
+  flex: 1;
+}
+
+.day {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.day.active {
+  border-color: var(--accent);
+}
+.day-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.day-total,
+.empty-day {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0;
+}
+
+.entries {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.entry-row {
+  padding: 7px 6px;
+  border-top: 1px solid var(--line);
+}
+.edit-row {
+  border-top: 1px solid var(--line);
+  padding: 10px 8px;
+  background: var(--accent-soft);
+  border-radius: 6px;
+}
+
+/* Start, End, Label, Description, then the row's duration and Delete or the form's Add. */
+.edit-grid {
+  display: grid;
+  grid-template-columns:
+    104px 104px minmax(100px, 150px)
+    minmax(0, 1fr) auto auto;
+  gap: 8px;
+  /* The prototype aligns to the start because its fields have labels above; these have none. */
+  align-items: center;
+}
+.add-entry.edit-grid {
+  grid-template-columns: 104px 104px minmax(100px, 150px) minmax(0, 1fr) auto;
+}
+.edit-grid input,
+.edit-grid select {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: var(--surface);
+  width: 100%;
+  min-width: 0;
+}
+.edit-grid .duration {
+  color: var(--muted);
+}
+.edit-grid .msg {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 560px) {
+  .edit-grid,
+  .add-entry.edit-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .edit-grid select,
+  .edit-grid .wide {
+    grid-column: 1 / -1;
+  }
+  .edit-grid .btn {
+    justify-self: end;
+  }
+  .add-entry .btn {
+    grid-column: 2;
+  }
+}

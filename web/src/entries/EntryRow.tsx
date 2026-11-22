@@ -84,9 +84,10 @@ export function EntryRow({
   }
 
   return (
-    <li>
+    <li className="entry-row edit-grid">
       <DraftInput
         name="Start"
+        className="num"
         saved={showStart(entry)}
         describedBy={describedBy}
         save={(text) =>
@@ -95,6 +96,7 @@ export function EntryRow({
       />
       <DraftInput
         name="End"
+        className="num"
         saved={showEnd(entry)}
         describedBy={describedBy}
         save={(text) =>
@@ -119,18 +121,23 @@ export function EntryRow({
       </select>
       <DraftInput
         name="Description"
+        className="wide"
         saved={entry.description}
         describedBy={describedBy}
         save={(description) =>
           save({ description }, (saved) => saved.description)
         }
       />
-      <span>{formatMinutes(durationOf(entry))}</span>
-      <button type="button" onClick={confirmRemove}>
+      <span className="duration num">{formatMinutes(durationOf(entry))}</span>
+      <button
+        className="btn danger small"
+        type="button"
+        onClick={confirmRemove}
+      >
         Delete
       </button>
       {message && (
-        <p id={messageId} role="alert">
+        <p className="msg err" id={messageId} role="alert">
           {message}
         </p>
       )}
@@ -140,6 +147,7 @@ export function EntryRow({
 
 interface DraftInputProps {
   name: string
+  className?: string
   /** The saved value; the draft starts from it and returns to it on Esc or a rejected save. */
   saved: string
   describedBy: string | undefined
@@ -151,7 +159,13 @@ interface DraftInputProps {
  * A text field that saves on Enter or blur when its text changed and reverts on Esc.
  * The row is rendered again with the saved values after a successful save.
  */
-function DraftInput({ name, saved, describedBy, save }: DraftInputProps) {
+function DraftInput({
+  name,
+  className,
+  saved,
+  describedBy,
+  save,
+}: DraftInputProps) {
   const [draft, setDraft] = useState(saved)
 
   async function onBlur() {
@@ -166,6 +180,7 @@ function DraftInput({ name, saved, describedBy, save }: DraftInputProps) {
 
   return (
     <input
+      className={className}
       aria-label={name}
       aria-describedby={describedBy}
       value={draft}
