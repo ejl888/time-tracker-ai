@@ -22,20 +22,22 @@ function App() {
   const [active, setActive] = useState<Screen>('entries')
 
   return (
-    <main>
-      <h1>Timetracker</h1>
-      <nav>
-        {screens.map(({ screen, title }) => (
-          <button
-            key={screen}
-            type="button"
-            aria-pressed={active === screen}
-            onClick={() => setActive(screen)}
-          >
-            {title}
-          </button>
-        ))}
-      </nav>
+    <main className="wrap">
+      <header className="app">
+        <h1 className="brand">Timetracker</h1>
+        <nav className="tabs">
+          {screens.map(({ screen, title }) => (
+            <button
+              key={screen}
+              type="button"
+              aria-pressed={active === screen}
+              onClick={() => setActive(screen)}
+            >
+              {title}
+            </button>
+          ))}
+        </nav>
+      </header>
       {active === 'entries' ? (
         <EntriesPage
           entries={app.entries}
