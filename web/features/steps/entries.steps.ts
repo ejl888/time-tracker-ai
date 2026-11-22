@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { Given, Then, When } from '@cucumber/cucumber'
 import type { DataTable } from '@cucumber/cucumber'
-import type { Temporal } from 'temporal-polyfill'
+import { Temporal } from 'temporal-polyfill'
 import {
   durationOf,
   endTimeOf,
@@ -44,33 +44,40 @@ async function addEntry(
 }
 
 /**
- * Adds and saves each row of a table with start and end, and optional label and description columns.
- * Without a label column, the entries get the hidden billable test label.
+ * Adds and saves one table row with start and end, and optional label and description columns.
+ * Without a label column, the entry gets the hidden billable test label.
  */
+async function addRow(
+  world: TimetrackerWorld,
+  date: Temporal.PlainDate,
+  row: Record<string, string>,
+) {
+  let name = row.label
+  if (name === undefined) {
+    await world.ensureTestLabel()
+    name = TEST_LABEL
+  }
+  await addEntry(
+    world,
+    date,
+    parseTime(row.start),
+    parseTime(row.end),
+    name,
+    row.description ?? '',
+  )
+  assert.ok(
+    world.lastResult?.ok,
+    `could not add the entry ${JSON.stringify(row)}: ${JSON.stringify(world.lastResult)}`,
+  )
+}
+
+/** Adds and saves each row of a table on the date; see addRow for the columns. */
 async function addEntries(
   world: TimetrackerWorld,
   date: Temporal.PlainDate,
   table: DataTable,
 ) {
-  for (const row of table.hashes()) {
-    let name = row.label
-    if (name === undefined) {
-      await world.ensureTestLabel()
-      name = TEST_LABEL
-    }
-    await addEntry(
-      world,
-      date,
-      parseTime(row.start),
-      parseTime(row.end),
-      name,
-      row.description ?? '',
-    )
-    assert.ok(
-      world.lastResult?.ok,
-      `could not add the entry ${JSON.stringify(row)}: ${JSON.stringify(world.lastResult)}`,
-    )
-  }
+  for (const row of table.hashes()) await addRow(world, date, row)
 }
 
 /** A wall-clock time as HH:MM text. */
@@ -110,6 +117,46 @@ Given(
     table: DataTable,
   ) {
     await addEntries(this, date, table)
+  },
+)
+
+Given(
+  'these entries:',
+  async function (this: TimetrackerWorld, table: DataTable) {
+    for (const row of table.hashes()) {
+      assert.ok(row.date, `no date in the row ${JSON.stringify(row)}`)
+      await addRow(this, Temporal.PlainDate.from(row.date), row)
+    }
+  },
+)
+
+Given(
+  'an entry on {date} from {time} to {time}',
+  async function (
+    this: TimetrackerWorld,
+    date: Temporal.PlainDate,
+    start: Temporal.PlainTime,
+    end: Temporal.PlainTime,
+  ) {
+    await this.ensureTestLabel()
+    await addEntry(this, date, start, end, TEST_LABEL, '')
+    assert.ok(
+      this.lastResult?.ok,
+      `could not add the entry: ${JSON.stringify(this.lastResult)}`,
+    )
+  },
+)
+
+When(
+  'I delete the entry on {date}',
+  async function (this: TimetrackerWorld, date: Temporal.PlainDate) {
+    const entries = await this.entryService.on(date)
+    assert.equal(entries.length, 1, `entries on ${date}: ${entries.length}`)
+    const result = await this.entryService.remove(entries[0].id)
+    assert.ok(
+      result.ok,
+      `could not delete the entry: ${JSON.stringify(result)}`,
+    )
   },
 )
 
