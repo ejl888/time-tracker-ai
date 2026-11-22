@@ -5,6 +5,7 @@ import { normalizeName } from '../domain/labels.ts'
 import type { Label } from '../domain/records.ts'
 import type { Result } from '../domain/result.ts'
 import { LabelRow } from './LabelRow.tsx'
+import './labels.css'
 
 /** The text shown to the user for a rejected label action. */
 function errorMessage(error: LabelError, name: string): string {
@@ -58,10 +59,10 @@ export function LabelsPage({ labels }: { labels: LabelService }) {
   }
 
   return (
-    <section>
+    <section className="panel">
       <h2>Labels</h2>
       {list.length > 0 && (
-        <ul>
+        <ul className="label-list">
           {list.map(({ label, used }) => (
             <LabelRow
               key={label.id}
@@ -77,12 +78,16 @@ export function LabelsPage({ labels }: { labels: LabelService }) {
           ))}
         </ul>
       )}
-      <form aria-label="Add label" onSubmit={add}>
-        <label>
+      <form className="add-label" aria-label="Add label" onSubmit={add}>
+        <label className="name-field">
           Name
-          <input value={name} onChange={(e) => setName(e.target.value)} />
+          <input
+            className="text-input"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
         </label>
-        <label>
+        <label className="switch">
           <input
             type="checkbox"
             checked={billable}
@@ -90,9 +95,15 @@ export function LabelsPage({ labels }: { labels: LabelService }) {
           />
           Billable
         </label>
-        <button type="submit">Add</button>
+        <button className="btn primary" type="submit">
+          Add
+        </button>
       </form>
-      {message && <p role="alert">{message}</p>}
+      {message && (
+        <p className="msg err" role="alert">
+          {message}
+        </p>
+      )}
     </section>
   )
 }
