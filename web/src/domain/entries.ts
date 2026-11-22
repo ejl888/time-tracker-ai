@@ -24,6 +24,9 @@ export type EntryChanges = Partial<
   Pick<NewEntry, 'start' | 'end' | 'labelId' | 'description'>
 >
 
+/** The date, wall-clock times and time zone of an entry. */
+type TimeRange = Pick<NewEntry, 'date' | 'start' | 'end' | 'timeZone'>
+
 /** Minutes since the start of the day of a wall-clock end time; an end of 00:00 is 24:00. */
 function endMinutesOf(end: Temporal.PlainTime): number {
   return end.equals(MIDNIGHT) ? 24 * 60 : end.hour * 60 + end.minute
@@ -68,7 +71,7 @@ function instantOf(
 }
 
 /** The start and end instants of an entry; an end of 00:00 is midnight at the end of the day, on the next date. */
-function instantsOf({ date, start, end, timeZone }: NewEntry): {
+function instantsOf({ date, start, end, timeZone }: TimeRange): {
   start: string
   end: string
 } {
@@ -133,16 +136,21 @@ const byStart = byInstant('start')
 /** Orders entries by their end instant. */
 const byEnd = byInstant('end')
 
+/** Whether one instant is before another. */
+function isBefore(a: string, b: string): boolean {
+  return (
+    Temporal.Instant.compare(
+      Temporal.Instant.from(a),
+      Temporal.Instant.from(b),
+    ) < 0
+  )
+}
+
 /** Whether, sorted by start, any entry starts before the previous one ends; adjacent entries do not overlap. */
 export function overlaps(entries: Entry[]): boolean {
   const sorted = [...entries].sort(byStart)
   return sorted.some(
-    (entry, i) =>
-      i > 0 &&
-      Temporal.Instant.compare(
-        Temporal.Instant.from(entry.start),
-        Temporal.Instant.from(sorted[i - 1].end),
-      ) < 0,
+    (entry, i) => i > 0 && isBefore(entry.start, sorted[i - 1].end),
   )
 }
 
@@ -151,21 +159,64 @@ export function isActiveOn(entry: Entry, date: Temporal.PlainDate): boolean {
   return !entry.deleted && dateOf(entry).equals(date)
 }
 
-/** The start and end time a new entry is prefilled with. */
-export type Prefill = { start: Temporal.PlainTime; end: Temporal.PlainTime }
-
-/** Where a day starts when no earlier day has entries. */
-const DAY_START = new Temporal.PlainTime(9)
-
 /** Entries that are not deleted on the date. */
 function activeOn(entries: Entry[], date: Temporal.PlainDate): Entry[] {
   return entries.filter((entry) => isActiveOn(entry, date))
 }
 
-/** The start time of the earliest of a day's entries, or undefined without entries. */
-function earliestStart(dayEntries: Entry[]): Temporal.PlainTime | undefined {
-  const earliest = [...dayEntries].sort(byStart).at(0)
-  return earliest && startTimeOf(earliest)
+/**
+ * The entries a time range overlaps, sorted by start: not deleted, not the candidate itself,
+ * on the candidate's date, and each starting before the other ends; adjacent entries do not overlap.
+ */
+export function overlapping(
+  candidate: TimeRange & { id?: string | undefined },
+  entries: Entry[],
+): Entry[] {
+  const range = instantsOf(candidate)
+  return activeOn(entries, candidate.date)
+    .filter(
+      (entry) =>
+        entry.id !== candidate.id &&
+        isBefore(entry.start, range.end) &&
+        isBefore(range.start, entry.end),
+    )
+    .sort(byStart)
+}
+
+/**
+ * Where a prefilled start comes from: the end of the previous entry that day,
+ * the first start on an earlier date, or the default day start.
+ */
+export type PrefillSource =
+  | { kind: 'previous' }
+  | { kind: 'same-as'; date: Temporal.PlainDate }
+  | { kind: 'default' }
+
+/** The start and end time a new entry is prefilled with, and where they come from. */
+export type Prefill = {
+  start: Temporal.PlainTime
+  end: Temporal.PlainTime
+  source: PrefillSource
+}
+
+/** A prefilled start time and where it comes from. */
+type SourcedStart = { start: Temporal.PlainTime; source: PrefillSource }
+
+/** Where a day starts when no earlier day has entries. */
+const DAY_START = new Temporal.PlainTime(9)
+
+/** The start time of the earliest entry on the date, with the date as its source, or undefined without entries. */
+function earliestStartOn(
+  date: Temporal.PlainDate,
+  entries: Entry[],
+): SourcedStart | undefined {
+  const earliest = activeOn(entries, date).sort(byStart).at(0)
+  return (
+    earliest && {
+      start: startTimeOf(earliest),
+      source: { kind: 'same-as', date },
+    }
+  )
 }
 
 /** The most recent date before the date with entries that are not deleted, or undefined. */
@@ -188,14 +239,12 @@ function latestDateBefore(
 function firstStartFor(
   date: Temporal.PlainDate,
   entries: Entry[],
-): Temporal.PlainTime {
-  const weekEarlier = earliestStart(
-    activeOn(entries, date.subtract({ days: 7 })),
-  )
+): SourcedStart {
+  const weekEarlier = earliestStartOn(date.subtract({ days: 7 }), entries)
   if (weekEarlier) return weekEarlier
   const latestDate = latestDateBefore(date, entries)
-  const latest = latestDate && earliestStart(activeOn(entries, latestDate))
-  return latest ?? DAY_START
+  const latest = latestDate && earliestStartOn(latestDate, entries)
+  return latest ?? { start: DAY_START, source: { kind: 'default' } }
 }
 
 /**
@@ -209,12 +258,12 @@ export function prefillFor(
 ): Prefill | undefined {
   const latest = activeOn(entries, date).sort(byEnd).at(-1)
   if (!latest) {
-    const start = firstStartFor(date, entries)
-    return { start, end: start }
+    const { start, source } = firstStartFor(date, entries)
+    return { start, end: start, source }
   }
   const end = endTimeOf(latest)
   if (end.equals(MIDNIGHT)) return undefined
-  return { start: end, end }
+  return { start: end, end, source: { kind: 'previous' } }
 }
 
 export function createEntryService(entries: Repository<Entry>, clock: Clock) {
