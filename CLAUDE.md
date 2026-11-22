@@ -45,6 +45,9 @@ Rules:
 - **Domain rules** (billed hours, balance, overlaps) are executable Gherkin, run with Cucumber.js now and Cucumber-JVM
   in the backend later, so web and backend share the same specs.
 - **UI details** (e.g. autocomplete) are tested with plain Vitest + React Testing Library.
+- **UI follows the prototype.** Screens take their layout and look from [docs/prototype/index.html](docs/prototype/index.html).
+  The plan (step 3) names which parts of the prototype the story builds; leaving out styling or layout is the
+  owner's decision, never an unstated default.
 - `specs/` lives at the repo root, not inside an app, because all apps share it.
 
 ## Agents
