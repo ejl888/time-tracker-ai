@@ -7,22 +7,29 @@ import { formatMinutes } from '../../src/domain/workedHours.ts'
 import { ZONE } from '../support/world.ts'
 import type { TimetrackerWorld } from '../support/world.ts'
 
-/** Adds an entry with the label of this name; keeps the result, and the entry when it was saved. */
+/**
+ * Adds an entry with the label of this name, or without a label when the name is undefined;
+ * keeps the result, and the entry when it was saved.
+ */
 async function addEntry(
   world: TimetrackerWorld,
   date: Temporal.PlainDate,
   start: Temporal.PlainTime,
   end: Temporal.PlainTime,
-  name: string,
+  name: string | undefined,
   description: string,
 ) {
-  const label = await world.findLabel(name)
-  assert.ok(label, `no label named ${name}`)
+  let labelId = ''
+  if (name !== undefined) {
+    const label = await world.findLabel(name)
+    assert.ok(label, `no label named ${name}`)
+    labelId = label.id
+  }
   const result = await world.entryService.add({
     date,
     start,
     end,
-    labelId: label.id,
+    labelId,
     description,
     timeZone: ZONE,
   })
@@ -149,5 +156,26 @@ Then('the entry is saved', function (this: TimetrackerWorld) {
   assert.ok(
     this.lastResult.ok,
     `the entry was rejected: ${JSON.stringify(this.lastResult)}`,
+  )
+})
+
+When(
+  'I add an entry on {date} from {time} to {time} without a label',
+  async function (
+    this: TimetrackerWorld,
+    date: Temporal.PlainDate,
+    start: Temporal.PlainTime,
+    end: Temporal.PlainTime,
+  ) {
+    await addEntry(this, date, start, end, undefined, '')
+  },
+)
+
+Then('the entry is rejected', function (this: TimetrackerWorld) {
+  assert.ok(this.lastResult, 'no entry was added')
+  assert.equal(
+    this.lastResult.ok,
+    false,
+    `the entry was saved: ${JSON.stringify(this.lastResult)}`,
   )
 })
