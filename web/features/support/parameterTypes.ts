@@ -18,11 +18,12 @@ defineParameterType({
   useForSnippets: false,
 })
 
-// A wall-clock time such as 09:00.
+// A wall-clock time such as 09:00. 24:00 (an entry that ends at midnight) becomes 00:00, as Temporal has no 24:00.
 defineParameterType({
   name: 'time',
   regexp: /\d{2}:\d{2}/,
-  transformer: (text: string) => Temporal.PlainTime.from(text),
+  transformer: (text: string) =>
+    Temporal.PlainTime.from(text === '24:00' ? '00:00' : text),
 })
 
 // A duration in hours and minutes such as 1:00, 7:45 or 150:00, kept as text to compare with formatted output.

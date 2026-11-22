@@ -1,10 +1,39 @@
 import assert from 'node:assert/strict'
 import { Given, Then, When } from '@cucumber/cucumber'
+import type { DataTable } from '@cucumber/cucumber'
 import type { Temporal } from 'temporal-polyfill'
-import { durationOf, startTimeOf } from '../../src/domain/entries.ts'
+import { durationOf, endTimeOf, startTimeOf } from '../../src/domain/entries.ts'
 import { formatMinutes } from '../../src/domain/workedHours.ts'
 import { ZONE } from '../support/world.ts'
 import type { TimetrackerWorld } from '../support/world.ts'
+
+/** Adds an entry with the label of this name; keeps the result, and the entry when it was saved. */
+async function addEntry(
+  world: TimetrackerWorld,
+  date: Temporal.PlainDate,
+  start: Temporal.PlainTime,
+  end: Temporal.PlainTime,
+  name: string,
+  description: string,
+) {
+  const label = await world.findLabel(name)
+  assert.ok(label, `no label named ${name}`)
+  const result = await world.entryService.add({
+    date,
+    start,
+    end,
+    labelId: label.id,
+    description,
+    timeZone: ZONE,
+  })
+  world.lastResult = result
+  if (result.ok) world.lastEntry = result.value
+}
+
+/** A wall-clock time as HH:MM text. */
+function hhmm(time: Temporal.PlainTime): string {
+  return time.toString({ smallestUnit: 'minute' })
+}
 
 Given(
   'an entry on {date} from {time} to {time} labelled {name}',
@@ -71,3 +100,54 @@ Then(
     )
   },
 )
+
+// Given and When share this step: the rejection scenarios use it as When.
+Given(
+  'I add an entry on {date} from {time} to {time} labelled {name}',
+  async function (
+    this: TimetrackerWorld,
+    date: Temporal.PlainDate,
+    start: Temporal.PlainTime,
+    end: Temporal.PlainTime,
+    name: string,
+  ) {
+    await addEntry(this, date, start, end, name, '')
+  },
+)
+
+When(
+  'I add an entry on {date} from {time} to {time} labelled {name} without a description',
+  async function (
+    this: TimetrackerWorld,
+    date: Temporal.PlainDate,
+    start: Temporal.PlainTime,
+    end: Temporal.PlainTime,
+    name: string,
+  ) {
+    await addEntry(this, date, start, end, name, '')
+  },
+)
+
+Then(
+  'the entries on {date} are:',
+  async function (
+    this: TimetrackerWorld,
+    date: Temporal.PlainDate,
+    table: DataTable,
+  ) {
+    const entries = await this.entryService.on(date)
+    const actual = entries.map((entry) => ({
+      start: hhmm(startTimeOf(entry)),
+      end: hhmm(endTimeOf(entry)),
+    }))
+    assert.deepEqual(actual, table.hashes())
+  },
+)
+
+Then('the entry is saved', function (this: TimetrackerWorld) {
+  assert.ok(this.lastResult, 'no entry was added')
+  assert.ok(
+    this.lastResult.ok,
+    `the entry was rejected: ${JSON.stringify(this.lastResult)}`,
+  )
+})
