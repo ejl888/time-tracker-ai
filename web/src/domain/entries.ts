@@ -154,22 +154,64 @@ export function isActiveOn(entry: Entry, date: Temporal.PlainDate): boolean {
 /** The start and end time a new entry is prefilled with. */
 export type Prefill = { start: Temporal.PlainTime; end: Temporal.PlainTime }
 
-/** Where a day without earlier entries starts. */
+/** Where a day starts when no earlier day has entries. */
 const DAY_START = new Temporal.PlainTime(9)
 
+/** Entries that are not deleted on the date. */
+function activeOn(entries: Entry[], date: Temporal.PlainDate): Entry[] {
+  return entries.filter((entry) => isActiveOn(entry, date))
+}
+
+/** The start time of the earliest of a day's entries, or undefined without entries. */
+function earliestStart(dayEntries: Entry[]): Temporal.PlainTime | undefined {
+  const earliest = [...dayEntries].sort(byStart).at(0)
+  return earliest && startTimeOf(earliest)
+}
+
+/** The most recent date before the date with entries that are not deleted, or undefined. */
+function latestDateBefore(
+  date: Temporal.PlainDate,
+  entries: Entry[],
+): Temporal.PlainDate | undefined {
+  return entries
+    .filter((entry) => !entry.deleted)
+    .map(dateOf)
+    .filter((day) => Temporal.PlainDate.compare(day, date) < 0)
+    .sort(Temporal.PlainDate.compare)
+    .at(-1)
+}
+
 /**
- * The times a new entry on the date starts with: the end of the latest entry that day, or 09:00 without entries.
+ * Where the first entry of a day starts: the first start on the same weekday a week earlier,
+ * otherwise on the most recent earlier day with entries, otherwise 09:00.
+ */
+function firstStartFor(
+  date: Temporal.PlainDate,
+  entries: Entry[],
+): Temporal.PlainTime {
+  const weekEarlier = earliestStart(
+    activeOn(entries, date.subtract({ days: 7 })),
+  )
+  if (weekEarlier) return weekEarlier
+  const latestDate = latestDateBefore(date, entries)
+  const latest = latestDate && earliestStart(activeOn(entries, latestDate))
+  return latest ?? DAY_START
+}
+
+/**
+ * The times a new entry on the date starts with: the end of the latest entry that day,
+ * or for the first entry of a day the start from `firstStartFor`.
  * Undefined when the day already ends at midnight.
  */
 export function prefillFor(
   date: Temporal.PlainDate,
   entries: Entry[],
 ): Prefill | undefined {
-  const latest = entries
-    .filter((entry) => isActiveOn(entry, date))
-    .sort(byEnd)
-    .at(-1)
-  if (!latest) return { start: DAY_START, end: DAY_START }
+  const latest = activeOn(entries, date).sort(byEnd).at(-1)
+  if (!latest) {
+    const start = firstStartFor(date, entries)
+    return { start, end: start }
+  }
   const end = endTimeOf(latest)
   if (end.equals(MIDNIGHT)) return undefined
   return { start: end, end }
@@ -195,7 +237,7 @@ export function createEntryService(entries: Repository<Entry>, clock: Clock) {
     /** Entries that are not deleted on the date, sorted by start. */
     async on(date: Temporal.PlainDate): Promise<Entry[]> {
       const all = await entries.all()
-      return all.filter((entry) => isActiveOn(entry, date)).sort(byStart)
+      return activeOn(all, date).sort(byStart)
     },
 
     /** The times a new entry on the date is prefilled with; see `prefillFor`. */
