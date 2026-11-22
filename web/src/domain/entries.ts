@@ -203,3 +203,5 @@ export function createEntryService(entries: Repository<Entry>, clock: Clock) {
     },
   }
 }
+
+export type EntryService = ReturnType<typeof createEntryService>
