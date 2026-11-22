@@ -6,6 +6,7 @@ import { overlaps, todayIn } from '../domain/entries.ts'
 import type { LabelService } from '../domain/labels.ts'
 import type { Entry, Label } from '../domain/records.ts'
 import { formatMinutes, workedMinutesOn } from '../domain/workedHours.ts'
+import { AddEntryRow } from './AddEntryRow.tsx'
 import { EntryRow } from './EntryRow.tsx'
 
 interface EntriesPageProps {
@@ -67,6 +68,11 @@ export function EntriesPage({
     }
   }, [date, entries, labels])
 
+  /** Loads the shown date again, e.g. after an entry was added. */
+  async function reload() {
+    setDay(await loadDay(date, entries, labels))
+  }
+
   const isToday = date.equals(today)
   const shown = day?.date.equals(date) ? day : undefined
 
@@ -87,7 +93,18 @@ export function EntriesPage({
       <button type="button" onClick={() => setDate(today)}>
         Today
       </button>
-      {shown && <DayEntries day={shown} />}
+      {shown && (
+        <>
+          <DayEntries day={shown} />
+          <AddEntryRow
+            entries={entries}
+            date={shown.date}
+            labels={shown.labels}
+            timeZone={timeZone}
+            onAdded={() => void reload()}
+          />
+        </>
+      )}
     </section>
   )
 }
