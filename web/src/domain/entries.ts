@@ -5,7 +5,8 @@ import type { Repository } from './repository.ts'
 import type { Result } from './result.ts'
 import { newRecordFields, toInstant, touch } from './recordFields.ts'
 
-export type EntryError = 'not-found'
+export type EntryError =
+  'end-not-after-start' | 'no-label' | 'after-today' | 'not-found'
 
 export interface NewEntry {
   date: Temporal.PlainDate
@@ -18,6 +19,37 @@ export interface NewEntry {
 }
 
 const MIDNIGHT = new Temporal.PlainTime()
+
+/** Minutes since the start of the day of a wall-clock end time; an end of 00:00 is 24:00. */
+function endMinutesOf(end: Temporal.PlainTime): number {
+  return end.equals(MIDNIGHT) ? 24 * 60 : end.hour * 60 + end.minute
+}
+
+/** Today's date in a time zone at the given moment. */
+export function todayIn(
+  now: Temporal.Instant,
+  timeZone: string,
+): Temporal.PlainDate {
+  return now.toZonedDateTimeISO(timeZone).toPlainDate()
+}
+
+/**
+ * The first rule an entry breaks, or undefined when it is valid.
+ * Times are compared as wall-clock times, so clock changes do not matter.
+ */
+function validate(
+  { date, start, end, labelId, timeZone }: NewEntry,
+  now: Temporal.Instant,
+): EntryError | undefined {
+  if (endMinutesOf(end) <= start.hour * 60 + start.minute) {
+    return 'end-not-after-start'
+  }
+  if (labelId === '') return 'no-label'
+  if (Temporal.PlainDate.compare(date, todayIn(now, timeZone)) > 0) {
+    return 'after-today'
+  }
+  return undefined
+}
 
 /** The UTC instant of a wall-clock time on a date in a zone; gaps and overlaps resolve as 'compatible'. */
 function instantOf(
@@ -65,14 +97,10 @@ export function isActiveOn(entry: Entry, date: Temporal.PlainDate): boolean {
 
 export function createEntryService(entries: Repository<Entry>, clock: Clock) {
   return {
-    async add({
-      date,
-      start,
-      end,
-      labelId,
-      description,
-      timeZone,
-    }: NewEntry): Promise<Result<Entry, EntryError>> {
+    async add(newEntry: NewEntry): Promise<Result<Entry, EntryError>> {
+      const error = validate(newEntry, clock.now())
+      if (error) return { ok: false, error }
+      const { date, start, end, labelId, description, timeZone } = newEntry
       // An end of 00:00 is midnight at the end of the day, so it falls on the next date.
       const endDate = end.equals(MIDNIGHT) ? date.add({ days: 1 }) : date
       const entry: Entry = {
