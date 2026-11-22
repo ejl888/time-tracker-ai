@@ -17,6 +17,8 @@ export interface NewEntry {
   timeZone: string
 }
 
+const MIDNIGHT = new Temporal.PlainTime()
+
 /** The UTC instant of a wall-clock time on a date in a zone; gaps and overlaps resolve as 'compatible'. */
 function instantOf(
   date: Temporal.PlainDate,
@@ -29,11 +31,14 @@ function instantOf(
   return toInstant(zoned.toInstant())
 }
 
+/** A stored UTC instant of an entry as a date and time in the entry's own time zone. */
+function zonedOf(entry: Entry, instant: string): Temporal.ZonedDateTime {
+  return Temporal.Instant.from(instant).toZonedDateTimeISO(entry.timeZone)
+}
+
 /** The date of an entry: the local date of its start in its own time zone. */
 export function dateOf(entry: Entry): Temporal.PlainDate {
-  return Temporal.Instant.from(entry.start)
-    .toZonedDateTimeISO(entry.timeZone)
-    .toPlainDate()
+  return zonedOf(entry, entry.start).toPlainDate()
 }
 
 /** The duration of an entry in whole minutes, between its start and end instants. */
@@ -45,9 +50,12 @@ export function durationOf(entry: Entry): number {
 
 /** The start of an entry as a wall-clock time in its own time zone. */
 export function startTimeOf(entry: Entry): Temporal.PlainTime {
-  return Temporal.Instant.from(entry.start)
-    .toZonedDateTimeISO(entry.timeZone)
-    .toPlainTime()
+  return zonedOf(entry, entry.start).toPlainTime()
+}
+
+/** The end of an entry as a wall-clock time in its own time zone; midnight is 00:00. */
+export function endTimeOf(entry: Entry): Temporal.PlainTime {
+  return zonedOf(entry, entry.end).toPlainTime()
 }
 
 /** Whether an entry is not deleted and falls on the date. */
@@ -65,10 +73,12 @@ export function createEntryService(entries: Repository<Entry>, clock: Clock) {
       description,
       timeZone,
     }: NewEntry): Promise<Result<Entry, EntryError>> {
+      // An end of 00:00 is midnight at the end of the day, so it falls on the next date.
+      const endDate = end.equals(MIDNIGHT) ? date.add({ days: 1 }) : date
       const entry: Entry = {
         ...newRecordFields(clock),
         start: instantOf(date, start, timeZone),
-        end: instantOf(date, end, timeZone),
+        end: instantOf(endDate, end, timeZone),
         timeZone,
         description,
         labelId,
