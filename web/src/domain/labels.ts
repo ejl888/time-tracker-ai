@@ -104,6 +104,21 @@ export function createLabelService(
   return {
     list,
 
+    /** The label with this id, deleted or not. */
+    get(id: string): Promise<Label | undefined> {
+      return labels.get(id)
+    },
+
+    /**
+     * The labels the entries use, deleted ones included, each once.
+     * Label ids without a stored label are left out.
+     */
+    async usedBy(used: Entry[]): Promise<Label[]> {
+      const ids = [...new Set(used.map((entry) => entry.labelId))]
+      const found = await Promise.all(ids.map((id) => labels.get(id)))
+      return found.filter((label) => label !== undefined)
+    },
+
     /** Like `list`, with whether entries use each label. */
     async listWithUsage(): Promise<ListedLabel[]> {
       const [listed, used] = await Promise.all([list(), usedLabelIds()])

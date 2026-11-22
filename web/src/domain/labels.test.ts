@@ -99,3 +99,37 @@ test('lists the labels by name with whether an entry that is not deleted uses th
     ],
   )
 })
+
+test('gets a label by id, also when it is deleted', async () => {
+  expect((await service.get(id))?.name).toBe('Support')
+
+  await service.remove(id)
+
+  const deleted = await service.get(id)
+  expect(deleted?.name).toBe('Support')
+  expect(deleted?.deleted).toBe(true)
+  expect(await service.get('unknown')).toBeUndefined()
+})
+
+test('gets the labels that entries use, deleted ones included, each once', async () => {
+  const client = await service.create('Client')
+  const admin = await service.create('Admin')
+  if (!client.ok || !admin.ok) throw new Error('create failed')
+  await service.remove(admin.value.id)
+  const used = [
+    entryWith(client.value.id, false),
+    entryWith(client.value.id, false),
+    entryWith(admin.value.id, false),
+    entryWith('missing', false),
+  ]
+
+  const result = await service.usedBy(used)
+
+  const byName = result
+    .map(({ name, deleted }) => ({ name, deleted }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+  expect(byName).toEqual([
+    { name: 'Admin', deleted: true },
+    { name: 'Client', deleted: false },
+  ])
+})
