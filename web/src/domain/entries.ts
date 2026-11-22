@@ -90,6 +90,27 @@ export function endTimeOf(entry: Entry): Temporal.PlainTime {
   return zonedOf(entry, entry.end).toPlainTime()
 }
 
+/** Orders entries by their start instant. */
+function byStart(a: Entry, b: Entry): number {
+  return Temporal.Instant.compare(
+    Temporal.Instant.from(a.start),
+    Temporal.Instant.from(b.start),
+  )
+}
+
+/** Whether, sorted by start, any entry starts before the previous one ends; adjacent entries do not overlap. */
+export function overlaps(entries: Entry[]): boolean {
+  const sorted = [...entries].sort(byStart)
+  return sorted.some(
+    (entry, i) =>
+      i > 0 &&
+      Temporal.Instant.compare(
+        Temporal.Instant.from(entry.start),
+        Temporal.Instant.from(sorted[i - 1].end),
+      ) < 0,
+  )
+}
+
 /** Whether an entry is not deleted and falls on the date. */
 export function isActiveOn(entry: Entry, date: Temporal.PlainDate): boolean {
   return !entry.deleted && dateOf(entry).equals(date)
@@ -118,14 +139,7 @@ export function createEntryService(entries: Repository<Entry>, clock: Clock) {
     /** Entries that are not deleted on the date, sorted by start. */
     async on(date: Temporal.PlainDate): Promise<Entry[]> {
       const all = await entries.all()
-      return all
-        .filter((entry) => isActiveOn(entry, date))
-        .sort((a, b) =>
-          Temporal.Instant.compare(
-            Temporal.Instant.from(a.start),
-            Temporal.Instant.from(b.start),
-          ),
-        )
+      return all.filter((entry) => isActiveOn(entry, date)).sort(byStart)
     },
 
     /** Soft-deletes an entry that is not deleted yet. */

@@ -2,7 +2,12 @@ import assert from 'node:assert/strict'
 import { Given, Then, When } from '@cucumber/cucumber'
 import type { DataTable } from '@cucumber/cucumber'
 import type { Temporal } from 'temporal-polyfill'
-import { durationOf, endTimeOf, startTimeOf } from '../../src/domain/entries.ts'
+import {
+  durationOf,
+  endTimeOf,
+  overlaps,
+  startTimeOf,
+} from '../../src/domain/entries.ts'
 import { formatMinutes } from '../../src/domain/workedHours.ts'
 import { ZONE } from '../support/world.ts'
 import type { TimetrackerWorld } from '../support/world.ts'
@@ -179,3 +184,19 @@ Then('the entry is rejected', function (this: TimetrackerWorld) {
     `the entry was saved: ${JSON.stringify(this.lastResult)}`,
   )
 })
+
+Then(
+  '{date} shows an overlap warning',
+  async function (this: TimetrackerWorld, date: Temporal.PlainDate) {
+    const entries = await this.entryService.on(date)
+    assert.equal(overlaps(entries), true, `no entries overlap on ${date}`)
+  },
+)
+
+Then(
+  '{date} shows no overlap warning',
+  async function (this: TimetrackerWorld, date: Temporal.PlainDate) {
+    const entries = await this.entryService.on(date)
+    assert.equal(overlaps(entries), false, `entries overlap on ${date}`)
+  },
+)
