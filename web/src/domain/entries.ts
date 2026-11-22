@@ -18,6 +18,11 @@ export interface NewEntry {
   timeZone: string
 }
 
+/** The fields of an entry that can be changed. */
+export type EntryChanges = Partial<
+  Pick<NewEntry, 'start' | 'end' | 'labelId' | 'description'>
+>
+
 const MIDNIGHT = new Temporal.PlainTime()
 
 /** Minutes since the start of the day of a wall-clock end time; an end of 00:00 is 24:00. */
@@ -63,6 +68,18 @@ function instantOf(
   return toInstant(zoned.toInstant())
 }
 
+/** The start and end instants of an entry; an end of 00:00 is midnight at the end of the day, on the next date. */
+function instantsOf({ date, start, end, timeZone }: NewEntry): {
+  start: string
+  end: string
+} {
+  const endDate = end.equals(MIDNIGHT) ? date.add({ days: 1 }) : date
+  return {
+    start: instantOf(date, start, timeZone),
+    end: instantOf(endDate, end, timeZone),
+  }
+}
+
 /** A stored UTC instant of an entry as a date and time in the entry's own time zone. */
 function zonedOf(entry: Entry, instant: string): Temporal.ZonedDateTime {
   return Temporal.Instant.from(instant).toZonedDateTimeISO(entry.timeZone)
@@ -88,6 +105,18 @@ export function startTimeOf(entry: Entry): Temporal.PlainTime {
 /** The end of an entry as a wall-clock time in its own time zone; midnight is 00:00. */
 export function endTimeOf(entry: Entry): Temporal.PlainTime {
   return zonedOf(entry, entry.end).toPlainTime()
+}
+
+/** An entry as the input it was made from, in its own time zone. */
+function inputOf(entry: Entry): NewEntry {
+  return {
+    date: dateOf(entry),
+    start: startTimeOf(entry),
+    end: endTimeOf(entry),
+    labelId: entry.labelId,
+    description: entry.description,
+    timeZone: entry.timeZone,
+  }
 }
 
 /** Orders entries by their start instant. */
@@ -121,13 +150,10 @@ export function createEntryService(entries: Repository<Entry>, clock: Clock) {
     async add(newEntry: NewEntry): Promise<Result<Entry, EntryError>> {
       const error = validate(newEntry, clock.now())
       if (error) return { ok: false, error }
-      const { date, start, end, labelId, description, timeZone } = newEntry
-      // An end of 00:00 is midnight at the end of the day, so it falls on the next date.
-      const endDate = end.equals(MIDNIGHT) ? date.add({ days: 1 }) : date
+      const { labelId, description, timeZone } = newEntry
       const entry: Entry = {
         ...newRecordFields(clock),
-        start: instantOf(date, start, timeZone),
-        end: instantOf(endDate, end, timeZone),
+        ...instantsOf(newEntry),
         timeZone,
         description,
         labelId,
@@ -140,6 +166,32 @@ export function createEntryService(entries: Repository<Entry>, clock: Clock) {
     async on(date: Temporal.PlainDate): Promise<Entry[]> {
       const all = await entries.all()
       return all.filter((entry) => isActiveOn(entry, date)).sort(byStart)
+    },
+
+    /** Changes an entry that is not deleted; an update that changes nothing is not saved. */
+    async update(
+      id: string,
+      changes: EntryChanges,
+    ): Promise<Result<Entry, EntryError>> {
+      const entry = await entries.get(id)
+      if (!entry || entry.deleted) return { ok: false, error: 'not-found' }
+      const input = { ...inputOf(entry), ...changes }
+      const error = validate(input, clock.now())
+      if (error) return { ok: false, error }
+      const fields = {
+        ...instantsOf(input),
+        labelId: input.labelId,
+        description: input.description,
+      }
+      const unchanged =
+        fields.start === entry.start &&
+        fields.end === entry.end &&
+        fields.labelId === entry.labelId &&
+        fields.description === entry.description
+      if (unchanged) return { ok: true, value: entry }
+      const updated = touch(entry, fields, clock)
+      await entries.save(updated)
+      return { ok: true, value: updated }
     },
 
     /** Soft-deletes an entry that is not deleted yet. */
