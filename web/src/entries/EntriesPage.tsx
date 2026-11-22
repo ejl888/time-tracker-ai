@@ -95,7 +95,11 @@ export function EntriesPage({
       </button>
       {shown && (
         <>
-          <DayEntries day={shown} />
+          <DayEntries
+            day={shown}
+            entries={entries}
+            onChanged={() => void reload()}
+          />
           <AddEntryRow
             entries={entries}
             date={shown.date}
@@ -109,8 +113,15 @@ export function EntriesPage({
   )
 }
 
+interface DayEntriesProps {
+  day: Day
+  entries: EntryService
+  /** Called after an entry was changed or deleted. */
+  onChanged: () => void
+}
+
 /** The worked hours, overlap warning and list of a loaded day. */
-function DayEntries({ day }: { day: Day }) {
+function DayEntries({ day, entries, onChanged }: DayEntriesProps) {
   const worked = workedMinutesOn(day.date, day.entries, day.usedLabels)
   const labelOf = (entry: Entry) =>
     day.usedLabels.find((label) => label.id === entry.labelId)
@@ -125,10 +136,14 @@ function DayEntries({ day }: { day: Day }) {
         <ul aria-label="Entries">
           {day.entries.map((entry) => (
             <EntryRow
-              key={entry.id}
+              // A saved change gives the row a new key, so its fields show the saved values.
+              key={`${entry.id}@${entry.updatedAt}`}
               entry={entry}
               labels={day.labels}
               label={labelOf(entry)}
+              update={(changes) => entries.update(entry.id, changes)}
+              remove={() => entries.remove(entry.id)}
+              onChanged={onChanged}
             />
           ))}
         </ul>
