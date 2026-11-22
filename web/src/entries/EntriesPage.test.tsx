@@ -332,7 +332,7 @@ async function addEntry(
   await user.click(addForm().getByRole('button', { name: 'Add' }))
 }
 
-test('adds an entry in time order, updates the worked hours and clears the add row', async () => {
+test('adds an entry in time order, updates the worked hours and prefills the add row', async () => {
   const { user } = await renderPage(workLabels, [
     { date: '2026-11-18', start: '09:00', end: '10:00', label: 'Client' },
     { date: '2026-11-18', start: '15:00', end: '16:00', label: 'Admin' },
@@ -366,8 +366,8 @@ test('adds an entry in time order, updates the worked hours and clears the add r
         screen.getByRole('form', { name: 'Add entry' }),
       ) & Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy()
-  expect(addForm().getByRole('textbox', { name: 'Start' })).toHaveValue('')
-  expect(addForm().getByRole('textbox', { name: 'End' })).toHaveValue('')
+  expect(addForm().getByRole('textbox', { name: 'Start' })).toHaveValue('16:00')
+  expect(addForm().getByRole('textbox', { name: 'End' })).toHaveValue('16:00')
   expect(addForm().getByRole('combobox', { name: 'Label' })).toHaveDisplayValue(
     'Pick a label',
   )
@@ -787,4 +787,104 @@ test('shows "(unknown label)" for an entry whose label is not stored', async () 
     label: '(unknown label)',
     description: 'Orphan',
   })
+})
+
+/** Waits until the add row shows these texts in Start and End. */
+async function expectAddTimes(start: string, end: string) {
+  await waitFor(() => {
+    expect(addForm().getByRole('textbox', { name: 'Start' })).toHaveValue(start)
+    expect(addForm().getByRole('textbox', { name: 'End' })).toHaveValue(end)
+  })
+}
+
+test("prefills the add row with the end of the day's latest entry", async () => {
+  await renderPage(workLabels, [
+    { date: '2026-11-18', start: '09:00', end: '10:30', label: 'Client' },
+  ])
+  await findEntries(1)
+
+  await expectAddTimes('10:30', '10:30')
+})
+
+test('prefills the add row with 09:00 when there are no entries', async () => {
+  await renderPage(workLabels)
+  await screen.findByText('No entries')
+
+  await expectAddTimes('09:00', '09:00')
+})
+
+test('prefills the add row again after an add and resets its label', async () => {
+  const { user } = await renderPage(workLabels, [
+    { date: '2026-11-18', start: '09:00', end: '10:30', label: 'Client' },
+  ])
+  await findEntries(1)
+  await expectAddTimes('10:30', '10:30')
+
+  await addEntry(user, { end: '11:15', label: 'Client' })
+
+  const found = await findEntries(2)
+  expect(found[1]).toMatchObject({ start: '10:30', end: '11:15' })
+  await expectAddTimes('11:15', '11:15')
+  expect(addForm().getByRole('combobox', { name: 'Label' })).toHaveDisplayValue(
+    'Pick a label',
+  )
+})
+
+test('keeps typed text in the add row when another entry changes', async () => {
+  const { user } = await renderPage(workLabels, [
+    { date: '2026-11-18', start: '09:00', end: '10:30', label: 'Client' },
+  ])
+  const [first] = await findEntries(1)
+  await expectAddTimes('10:30', '10:30')
+
+  await fillAddForm(user, { start: '08:00' })
+  const end = rowField(first.item, 'End')
+  await user.clear(end)
+  await user.type(end, '12:00{Enter}')
+
+  expect(await screen.findByText('Worked 3:00')).toBeInTheDocument()
+  expect(addForm().getByRole('textbox', { name: 'Start' })).toHaveValue('08:00')
+})
+
+test('leaves the add row empty on a day whose latest entry ends at 24:00', async () => {
+  await renderPage(workLabels, [
+    { date: '2026-11-18', start: '22:00', end: '00:00', label: 'Client' },
+  ])
+  await findEntries(1)
+
+  await expectAddTimes('', '')
+})
+
+test('prefills the add row for the day shown after going to the previous day', async () => {
+  const { user } = await renderPage(workLabels, [
+    { date: '2026-11-17', start: '08:00', end: '09:00', label: 'Client' },
+  ])
+  await screen.findByText('No entries')
+  // Today has no entries, so it takes the earliest start of the day before.
+  await expectAddTimes('08:00', '08:00')
+
+  await user.click(screen.getByRole('button', { name: 'Previous day' }))
+  expect(
+    await screen.findByRole('heading', { name: 'Tuesday 17 November 2026' }),
+  ).toBeInTheDocument()
+  await findEntries(1)
+
+  await expectAddTimes('09:00', '09:00')
+})
+
+test('leaves the end empty when the prefilled start is 00:00', async () => {
+  const { user } = await renderPage(workLabels, [
+    { date: '2026-11-17', start: '00:00', end: '08:00', label: 'Client' },
+  ])
+  await screen.findByText('No entries')
+  // Today has no entries, so it takes the earliest start of the day before.
+  await expectAddTimes('00:00', '')
+
+  await addEntry(user, { label: 'Client' })
+
+  expect(await addForm().findByRole('alert')).toHaveTextContent(
+    'Enter a time as HH:MM',
+  )
+  expect(screen.getByText('No entries')).toBeInTheDocument()
+  expect(listedEntries()).toEqual([])
 })

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Temporal } from 'temporal-polyfill'
 import type { Clock } from '../domain/clock.ts'
-import type { EntryService } from '../domain/entries.ts'
+import type { EntryService, Prefill } from '../domain/entries.ts'
 import { overlaps, todayIn } from '../domain/entries.ts'
 import type { LabelService } from '../domain/labels.ts'
 import type { Entry, Label } from '../domain/records.ts'
@@ -25,6 +25,8 @@ interface Day {
   labels: Label[]
   /** The labels the entries use, deleted ones included. */
   usedLabels: Label[]
+  /** The times a new entry on the date is prefilled with. */
+  prefill: Prefill | undefined
 }
 
 /** A date in English, e.g. "Wednesday 18 November 2026", built from parts so no comma appears. */
@@ -34,18 +36,19 @@ function formatDateHeading(date: Temporal.PlainDate): string {
   return `${weekday} ${date.day} ${month} ${date.year}`
 }
 
-/** Loads the entries of a date and the labels they use. */
+/** Loads the entries of a date, the labels they use and the prefill for a new entry. */
 async function loadDay(
   date: Temporal.PlainDate,
   entries: EntryService,
   labels: LabelService,
 ): Promise<Day> {
-  const [dayEntries, active] = await Promise.all([
+  const [dayEntries, active, prefill] = await Promise.all([
     entries.on(date),
     labels.list(),
+    entries.prefill(date),
   ])
   const usedLabels = await labels.usedBy(dayEntries)
-  return { date, entries: dayEntries, labels: active, usedLabels }
+  return { date, entries: dayEntries, labels: active, usedLabels, prefill }
 }
 
 /** The entries of one day, today by default, with buttons to go to other days. */
@@ -118,6 +121,7 @@ export function EntriesPage({
             date={shown.date}
             labels={shown.labels}
             timeZone={timeZone}
+            prefill={shown.prefill}
             onAdded={() => void reload()}
           />
         </div>
