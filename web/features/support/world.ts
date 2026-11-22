@@ -4,6 +4,7 @@ import { Temporal } from 'temporal-polyfill'
 import { fixedClock } from '../../src/domain/clock.ts'
 import type { Clock } from '../../src/domain/clock.ts'
 import { createEntryService } from '../../src/domain/entries.ts'
+import type { Prefill } from '../../src/domain/entries.ts'
 import { createLabelService } from '../../src/domain/labels.ts'
 import type { LabelService } from '../../src/domain/labels.ts'
 import type { Entry, Label } from '../../src/domain/records.ts'
@@ -18,6 +19,9 @@ const TIME_OF_DAY = Temporal.PlainTime.from('12:00')
 
 type EntryService = ReturnType<typeof createEntryService>
 
+/** Name of the hidden billable label for entries in a table without a label column. */
+export const TEST_LABEL = 'Test'
+
 export class TimetrackerWorld extends World {
   labels = new InMemoryRepository<Label>()
   entries = new InMemoryRepository<Entry>()
@@ -29,6 +33,9 @@ export class TimetrackerWorld extends World {
   lastEntry: Entry | undefined
   /** The result of the last action that can be rejected. */
   lastResult: Result<unknown, unknown> | undefined
+  /** The prefill of the last new entry that was started. */
+  prefill: Prefill | undefined
+  private hasTestLabel = false
 
   constructor(options: IWorldOptions) {
     super(options)
@@ -51,6 +58,16 @@ export class TimetrackerWorld extends World {
   async findLabel(name: string): Promise<Label | undefined> {
     const labels = await this.labelService.list()
     return labels.find((label) => label.name === name)
+  }
+
+  /** Creates the billable test label the first time it is needed in a scenario. */
+  async ensureTestLabel(): Promise<void> {
+    if (this.hasTestLabel) return
+    const result = await this.labelService.create(TEST_LABEL)
+    if (!result.ok) {
+      throw new Error(`could not create the test label: ${result.error}`)
+    }
+    this.hasTestLabel = true
   }
 
   private buildLabelService() {
