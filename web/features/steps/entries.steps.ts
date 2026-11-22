@@ -200,3 +200,21 @@ Then(
     assert.equal(overlaps(entries), false, `entries overlap on ${date}`)
   },
 )
+
+When(
+  'I change the end time of that entry to {time}',
+  async function (this: TimetrackerWorld, end: Temporal.PlainTime) {
+    assert.ok(this.lastEntry, 'there is no entry yet')
+    const result = await this.entryService.update(this.lastEntry.id, { end })
+    this.lastResult = result
+    if (result.ok) this.lastEntry = result.value
+  },
+)
+
+Then(
+  'there are no entries on {date}',
+  async function (this: TimetrackerWorld, date: Temporal.PlainDate) {
+    const entries = await this.entryService.on(date)
+    assert.equal(entries.length, 0, `entries on ${date}: ${entries.length}`)
+  },
+)
