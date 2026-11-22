@@ -64,13 +64,19 @@ export function AddEntryRow({
   }
 
   return (
-    <form aria-label="Add entry" onSubmit={add}>
+    <form
+      className="add-entry edit-row edit-grid"
+      aria-label="Add entry"
+      onSubmit={add}
+    >
       <input
+        className="num"
         aria-label="Start"
         value={startText}
         onChange={(e) => setStartText(e.target.value)}
       />
       <input
+        className="num"
         aria-label="End"
         value={endText}
         onChange={(e) => setEndText(e.target.value)}
@@ -88,12 +94,19 @@ export function AddEntryRow({
         ))}
       </select>
       <input
+        className="wide"
         aria-label="Description"
         value={description}
         onChange={(e) => setDescription(e.target.value)}
       />
-      <button type="submit">Add</button>
-      {message && <p role="alert">{message}</p>}
+      <button className="btn primary small" type="submit">
+        Add
+      </button>
+      {message && (
+        <p className="msg err" role="alert">
+          {message}
+        </p>
+      )}
     </form>
   )
 }
