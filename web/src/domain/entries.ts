@@ -118,13 +118,20 @@ function inputOf(entry: Entry): NewEntry {
   }
 }
 
-/** Orders entries by their start instant. */
-function byStart(a: Entry, b: Entry): number {
-  return Temporal.Instant.compare(
-    Temporal.Instant.from(a.start),
-    Temporal.Instant.from(b.start),
-  )
+/** Orders entries by one of their instants. */
+function byInstant(field: 'start' | 'end') {
+  return (a: Entry, b: Entry): number =>
+    Temporal.Instant.compare(
+      Temporal.Instant.from(a[field]),
+      Temporal.Instant.from(b[field]),
+    )
 }
+
+/** Orders entries by their start instant. */
+const byStart = byInstant('start')
+
+/** Orders entries by their end instant. */
+const byEnd = byInstant('end')
 
 /** Whether, sorted by start, any entry starts before the previous one ends; adjacent entries do not overlap. */
 export function overlaps(entries: Entry[]): boolean {
@@ -142,6 +149,30 @@ export function overlaps(entries: Entry[]): boolean {
 /** Whether an entry is not deleted and falls on the date. */
 export function isActiveOn(entry: Entry, date: Temporal.PlainDate): boolean {
   return !entry.deleted && dateOf(entry).equals(date)
+}
+
+/** The start and end time a new entry is prefilled with. */
+export type Prefill = { start: Temporal.PlainTime; end: Temporal.PlainTime }
+
+/** Where a day without earlier entries starts. */
+const DAY_START = new Temporal.PlainTime(9)
+
+/**
+ * The times a new entry on the date starts with: the end of the latest entry that day, or 09:00 without entries.
+ * Undefined when the day already ends at midnight.
+ */
+export function prefillFor(
+  date: Temporal.PlainDate,
+  entries: Entry[],
+): Prefill | undefined {
+  const latest = entries
+    .filter((entry) => isActiveOn(entry, date))
+    .sort(byEnd)
+    .at(-1)
+  if (!latest) return { start: DAY_START, end: DAY_START }
+  const end = endTimeOf(latest)
+  if (end.equals(MIDNIGHT)) return undefined
+  return { start: end, end }
 }
 
 export function createEntryService(entries: Repository<Entry>, clock: Clock) {
@@ -165,6 +196,11 @@ export function createEntryService(entries: Repository<Entry>, clock: Clock) {
     async on(date: Temporal.PlainDate): Promise<Entry[]> {
       const all = await entries.all()
       return all.filter((entry) => isActiveOn(entry, date)).sort(byStart)
+    },
+
+    /** The times a new entry on the date is prefilled with; see `prefillFor`. */
+    async prefill(date: Temporal.PlainDate): Promise<Prefill | undefined> {
+      return prefillFor(date, await entries.all())
     },
 
     /** Changes an entry that is not deleted; an update that changes nothing is not saved. */

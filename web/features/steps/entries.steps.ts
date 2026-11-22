@@ -9,7 +9,8 @@ import {
   startTimeOf,
 } from '../../src/domain/entries.ts'
 import { formatMinutes } from '../../src/domain/workedHours.ts'
-import { ZONE } from '../support/world.ts'
+import { parseTime } from '../support/parameterTypes.ts'
+import { TEST_LABEL, ZONE } from '../support/world.ts'
 import type { TimetrackerWorld } from '../support/world.ts'
 
 /**
@@ -42,6 +43,36 @@ async function addEntry(
   if (result.ok) world.lastEntry = result.value
 }
 
+/**
+ * Adds and saves each row of a table with start and end, and optional label and description columns.
+ * Without a label column, the entries get the hidden billable test label.
+ */
+async function addEntries(
+  world: TimetrackerWorld,
+  date: Temporal.PlainDate,
+  table: DataTable,
+) {
+  for (const row of table.hashes()) {
+    let name = row.label
+    if (name === undefined) {
+      await world.ensureTestLabel()
+      name = TEST_LABEL
+    }
+    await addEntry(
+      world,
+      date,
+      parseTime(row.start),
+      parseTime(row.end),
+      name,
+      row.description ?? '',
+    )
+    assert.ok(
+      world.lastResult?.ok,
+      `could not add the entry ${JSON.stringify(row)}: ${JSON.stringify(world.lastResult)}`,
+    )
+  }
+}
+
 /** A wall-clock time as HH:MM text. */
 function hhmm(time: Temporal.PlainTime): string {
   return time.toString({ smallestUnit: 'minute' })
@@ -68,6 +99,17 @@ Given(
     })
     assert.ok(result.ok, `could not add the entry: ${JSON.stringify(result)}`)
     this.lastEntry = result.value
+  },
+)
+
+Given(
+  'these entries on {date}:',
+  async function (
+    this: TimetrackerWorld,
+    date: Temporal.PlainDate,
+    table: DataTable,
+  ) {
+    await addEntries(this, date, table)
   },
 )
 
