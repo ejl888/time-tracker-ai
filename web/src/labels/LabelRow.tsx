@@ -60,8 +60,9 @@ export function LabelRow({
   }
 
   return (
-    <li>
+    <li className="label-row">
       <input
+        className="name text-input"
         aria-label="Label name"
         aria-describedby={message ? messageId : undefined}
         value={draft}
@@ -69,7 +70,7 @@ export function LabelRow({
         onKeyDown={onKeyDown}
         onBlur={() => void save()}
       />
-      <label>
+      <label className="switch">
         <input
           type="checkbox"
           checked={label.billable}
@@ -78,12 +79,20 @@ export function LabelRow({
         />
         Billable
       </label>
-      {used && <span>In use: create a new label to change this</span>}
-      <button type="button" onClick={confirmRemove}>
+      {used && (
+        <span className="in-use">
+          In use: create a new label to change this
+        </span>
+      )}
+      <button
+        className="btn danger small"
+        type="button"
+        onClick={confirmRemove}
+      >
         Delete
       </button>
       {message && (
-        <p id={messageId} role="alert">
+        <p id={messageId} className="msg err" role="alert">
           {message}
         </p>
       )}
