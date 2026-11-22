@@ -4,6 +4,7 @@ import type { Entry } from './records.ts'
 import type { Repository } from './repository.ts'
 import type { Result } from './result.ts'
 import { newRecordFields, toInstant, touch } from './recordFields.ts'
+import { MIDNIGHT } from './timeText.ts'
 
 export type EntryError =
   'end-not-after-start' | 'no-label' | 'after-today' | 'not-found'
@@ -22,8 +23,6 @@ export interface NewEntry {
 export type EntryChanges = Partial<
   Pick<NewEntry, 'start' | 'end' | 'labelId' | 'description'>
 >
-
-const MIDNIGHT = new Temporal.PlainTime()
 
 /** Minutes since the start of the day of a wall-clock end time; an end of 00:00 is 24:00. */
 function endMinutesOf(end: Temporal.PlainTime): number {
