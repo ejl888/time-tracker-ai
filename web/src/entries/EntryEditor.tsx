@@ -1,19 +1,10 @@
-import { useEffect, useId, useRef, useState } from 'react'
-import type { FormEvent } from 'react'
-import type { EntryChanges, EntryError } from '../domain/entries.ts'
+import { useEffect, useRef, useState } from 'react'
+import type { EntryChanges } from '../domain/entries.ts'
 import { endTimeOf, startTimeOf } from '../domain/entries.ts'
 import type { Entry, Label } from '../domain/records.ts'
-import type { Result } from '../domain/result.ts'
-import {
-  formatEndTime,
-  formatTime,
-  parseEndTime,
-  parseTime,
-} from '../domain/timeText.ts'
-import { cancelOnEscape } from './cancelOnEscape.ts'
-import { INVALID_TIME_MESSAGE, entryErrorMessage } from './entryMessages.ts'
-
-type EntryResult = Result<Entry, EntryError>
+import { formatEndTime, formatTime } from '../domain/timeText.ts'
+import type { Draft, EntryResult, LabelChoice } from './EntryForm.tsx'
+import { EntryForm } from './EntryForm.tsx'
 
 interface EntryEditorProps {
   entry: Entry
@@ -29,14 +20,6 @@ interface EntryEditorProps {
   onCancel: () => void
 }
 
-/** The texts of the editor's fields. */
-interface Draft {
-  startText: string
-  endText: string
-  labelId: string
-  description: string
-}
-
 function draftOf(entry: Entry): Draft {
   return {
     startText: formatTime(startTimeOf(entry)),
@@ -46,9 +29,26 @@ function draftOf(entry: Entry): Draft {
   }
 }
 
+/** The labels to pick from, preceded by the entry's own label when it is unknown or deleted. */
+function labelChoicesOf(
+  entry: Entry,
+  labels: Label[],
+  label: Label | undefined,
+): LabelChoice[] {
+  const choices = labels.map((option) => ({
+    value: option.id,
+    name: option.name,
+  }))
+  if (!label)
+    return [{ value: entry.labelId, name: '(unknown label)' }, ...choices]
+  if (label.deleted)
+    return [{ value: label.id, name: `${label.name} (deleted)` }, ...choices]
+  return choices
+}
+
 /**
- * The inline editor of a listed entry. Save or Enter saves; Cancel or Esc closes without saving.
- * Delete takes two clicks. A rejected save keeps the editor open with the typed values and shows why.
+ * The inline editor of a listed entry, with focus on Description. Save or Enter saves; Cancel or Esc closes without
+ * saving. Delete takes two clicks. A rejected save keeps the editor open with the typed values and shows why.
  */
 export function EntryEditor({
   entry,
@@ -60,118 +60,24 @@ export function EntryEditor({
   onCancel,
 }: EntryEditorProps) {
   const [draft, setDraft] = useState(() => draftOf(entry))
-  const [message, setMessage] = useState<string>()
-  const [deleteArmed, setDeleteArmed] = useState(false)
   const descriptionRef = useRef<HTMLInputElement>(null)
-  const id = useId()
-  const { startText, endText, labelId, description } = draft
 
   useEffect(() => {
     descriptionRef.current?.focus()
   }, [])
 
-  function change(changes: Partial<Draft>) {
-    setDraft({ ...draft, ...changes })
-  }
-
-  /** Runs an action, then reports it as done or shows why it was rejected. */
-  async function run(action: Promise<EntryResult>) {
-    const result = await action
-    if (result.ok) onDone()
-    else setMessage(entryErrorMessage(result.error))
-  }
-
-  function save(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const start = parseTime(startText)
-    const end = parseEndTime(endText)
-    if (!start || !end) {
-      setMessage(INVALID_TIME_MESSAGE)
-      return
-    }
-    void run(update({ start, end, labelId, description }))
-  }
-
-  /** The first click arms Delete; the second click deletes. */
-  function clickDelete() {
-    if (deleteArmed) void run(remove())
-    else setDeleteArmed(true)
-  }
-
   return (
-    <form
-      className="edit-form"
-      aria-label="Edit entry"
-      noValidate
-      autoComplete="off"
-      onSubmit={save}
-      onKeyDown={cancelOnEscape(onCancel)}
-    >
-      <div className="edit-grid">
-        <div className="field">
-          <label htmlFor={`${id}-start`}>Start</label>
-          <input
-            id={`${id}-start`}
-            className="num"
-            value={startText}
-            onChange={(e) => change({ startText: e.target.value })}
-          />
-        </div>
-        <div className="field">
-          <label htmlFor={`${id}-end`}>End</label>
-          <input
-            id={`${id}-end`}
-            className="num"
-            value={endText}
-            onChange={(e) => change({ endText: e.target.value })}
-          />
-        </div>
-        <div className="field wide">
-          <label htmlFor={`${id}-description`}>Description</label>
-          <input
-            id={`${id}-description`}
-            ref={descriptionRef}
-            value={description}
-            onChange={(e) => change({ description: e.target.value })}
-          />
-        </div>
-        <div className="field wide">
-          <label htmlFor={`${id}-label`}>Label</label>
-          <select
-            id={`${id}-label`}
-            value={labelId}
-            onChange={(e) => change({ labelId: e.target.value })}
-          >
-            {!label && <option value={entry.labelId}>(unknown label)</option>}
-            {label?.deleted && (
-              <option value={label.id}>{`${label.name} (deleted)`}</option>
-            )}
-            {labels.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-      {message && (
-        <p className="msg err" role="alert">
-          {message}
-        </p>
-      )}
-      <div className="actions">
-        <button className="btn primary" type="submit">
-          Save
-        </button>
-        <button className="btn" type="button" onClick={onCancel}>
-          Cancel
-        </button>
-        <button className="btn danger" type="button" onClick={clickDelete}>
-          {deleteArmed ? 'Click again to delete' : 'Delete'}
-        </button>
-        <span className="spacer" />
-        <span className="keys">Enter saves · Esc cancels</span>
-      </div>
-    </form>
+    <EntryForm
+      name="Edit entry"
+      submitText="Save"
+      draft={draft}
+      onChange={(changes) => setDraft({ ...draft, ...changes })}
+      labelChoices={labelChoicesOf(entry, labels, label)}
+      save={update}
+      remove={remove}
+      onDone={onDone}
+      onCancel={onCancel}
+      descriptionRef={descriptionRef}
+    />
   )
 }

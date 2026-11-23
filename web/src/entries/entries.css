@@ -102,11 +102,6 @@
   gap: 8px;
   align-items: start;
 }
-/* The add row: Start, End, Label, Description and Add, without labels above, so centred. */
-.add-entry.edit-grid {
-  grid-template-columns: 104px 104px minmax(100px, 150px) minmax(0, 1fr) auto;
-  align-items: center;
-}
 .edit-grid input,
 .edit-grid select {
   border: 1px solid var(--line);
@@ -119,11 +114,8 @@
 .edit-grid .duration {
   color: var(--muted);
 }
-.edit-grid .msg {
-  grid-column: 1 / -1;
-}
 
-/* The editor of a listed entry: labelled fields, then messages and actions. */
+/* The editor of an entry and the add row: labelled fields, then messages and actions. */
 .edit-form {
   display: flex;
   flex-direction: column;
@@ -147,18 +139,10 @@
 }
 
 @media (max-width: 560px) {
-  .edit-grid,
-  .add-entry.edit-grid {
+  .edit-grid {
     grid-template-columns: 1fr 1fr;
   }
-  .edit-grid select,
   .edit-grid .wide {
     grid-column: 1 / -1;
-  }
-  .edit-grid .btn {
-    justify-self: end;
-  }
-  .add-entry .btn {
-    grid-column: 2;
   }
 }
