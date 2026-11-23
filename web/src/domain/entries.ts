@@ -78,16 +78,66 @@ function validate(
   return undefined
 }
 
+/** A wall-clock time on a date in a zone, with gaps and overlaps resolved as asked. */
+function zonedAt(
+  date: Temporal.PlainDate,
+  time: Temporal.PlainTime,
+  timeZone: string,
+  disambiguation: 'compatible' | 'earlier' | 'later',
+): Temporal.ZonedDateTime {
+  return date
+    .toPlainDateTime(time)
+    .toZonedDateTime(timeZone, { disambiguation })
+}
+
 /** The UTC instant of a wall-clock time on a date in a zone; gaps and overlaps resolve as 'compatible'. */
 function instantOf(
   date: Temporal.PlainDate,
   time: Temporal.PlainTime,
   timeZone: string,
 ): string {
-  const zoned = date.toPlainDateTime(time).toZonedDateTime(timeZone, {
-    disambiguation: 'compatible',
-  })
-  return toInstant(zoned.toInstant())
+  return toInstant(zonedAt(date, time, timeZone, 'compatible').toInstant())
+}
+
+/**
+ * A note about a time on the night the clocks change: it does not exist and `becomes` the time it is stored as,
+ * or it occurs twice and the earlier one is used.
+ */
+export type ClockChangeNote =
+  | { kind: 'skipped'; time: Temporal.PlainTime; becomes: Temporal.PlainTime }
+  | { kind: 'repeated'; time: Temporal.PlainTime }
+
+/** The clock-change note for a wall-clock time on a date in a zone, or undefined for a normal time. */
+function clockChangeNoteOf(
+  date: Temporal.PlainDate,
+  time: Temporal.PlainTime,
+  timeZone: string,
+): ClockChangeNote | undefined {
+  const becomes = zonedAt(date, time, timeZone, 'compatible').toPlainTime()
+  if (!becomes.equals(time)) return { kind: 'skipped', time, becomes }
+  const earlier = zonedAt(date, time, timeZone, 'earlier')
+  const later = zonedAt(date, time, timeZone, 'later')
+  if (!earlier.toInstant().equals(later.toInstant())) {
+    return { kind: 'repeated', time }
+  }
+  return undefined
+}
+
+/**
+ * The clock-change notes for the start and then the end of a time range;
+ * an end of 00:00 is midnight on the next date and gets no note, nor does an end equal to the start.
+ */
+export function clockChangeNotes({
+  date,
+  start,
+  end,
+  timeZone,
+}: TimeRange): ClockChangeNote[] {
+  const times =
+    end.equals(MIDNIGHT) || end.equals(start) ? [start] : [start, end]
+  return times
+    .map((time) => clockChangeNoteOf(date, time, timeZone))
+    .filter((note) => note !== undefined)
 }
 
 /** The start and end instants of an entry; an end of 00:00 is midnight at the end of the day, on the next date. */
