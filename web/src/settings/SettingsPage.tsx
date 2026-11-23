@@ -3,6 +3,7 @@ import type { ContractService } from '../domain/contracts.ts'
 import type { LabelService } from '../domain/labels.ts'
 import { LabelsPage } from '../labels/LabelsPage.tsx'
 import { ContractPanel } from './ContractPanel.tsx'
+import './settings.css'
 
 /** The settings screen: the contract above the labels. */
 export function SettingsPage({

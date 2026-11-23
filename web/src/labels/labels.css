@@ -1,19 +1,4 @@
-/* Labels screen, from the Settings view in docs/prototype/index.html. */
-.panel {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-.panel h2 {
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 18px;
-  margin: 0;
-}
+/* Labels panel, from the Settings view in docs/prototype/index.html. The .panel look is in settings.css. */
 
 .label-list {
   list-style: none;
