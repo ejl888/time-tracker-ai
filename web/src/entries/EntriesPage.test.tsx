@@ -1206,3 +1206,662 @@ test('stops moving End along with Start once End was cleared by hand', async () 
 
   await expectAddTimes('11:00', '')
 })
+
+// Help texts and messages while editing, as in the prototype's editor. Help
+// texts are linked to their field (aria-describedby): where the prefill comes
+// from for Start, the duration for End and billable or not for Label.
+// Messages (end before start, overlaps) show below the fields instead.
+
+/** The live end-after-start message. */
+const endNotAfterStart = /^End must be after start/
+
+/**
+ * Renders the page like `renderPage`, plus entries today whose label is not
+ * stored.
+ */
+async function renderWithUnknownLabel(
+  seedEntries: SeedEntry[],
+  orphans: { start: string; end: string; description?: string }[],
+) {
+  const entryRepository = new InMemoryRepository<Entry>()
+  const labels = createLabelService(
+    new InMemoryRepository<Label>(),
+    entryRepository,
+    clock,
+  )
+  const entries = createEntryService(entryRepository, clock)
+  const ids = new Map<string, string>()
+  for (const { name, billable } of workLabels) {
+    const created = await labels.create(name, { billable })
+    if (!created.ok) throw new Error(`could not seed label ${name}`)
+    ids.set(name, created.value.id)
+  }
+  const seeds = [
+    ...seedEntries.map((seed) => ({
+      ...seed,
+      date: Temporal.PlainDate.from(seed.date),
+      labelId: ids.get(seed.label) ?? '',
+    })),
+    ...orphans.map((orphan) => ({
+      ...orphan,
+      date: today,
+      labelId: 'missing',
+    })),
+  ]
+  for (const seed of seeds) {
+    const added = await entries.add({
+      date: seed.date,
+      start: Temporal.PlainTime.from(seed.start),
+      end: Temporal.PlainTime.from(seed.end),
+      labelId: seed.labelId,
+      description: seed.description ?? '',
+      timeZone,
+    })
+    if (!added.ok) throw new Error(`could not seed entry: ${added.error}`)
+  }
+  render(
+    <EntriesPage
+      entries={entries}
+      labels={labels}
+      clock={clock}
+      timeZone={timeZone}
+    />,
+  )
+  await screen.findByRole('heading', { name: 'Entries' })
+  return { user: userEvent.setup() }
+}
+
+test('shows "End must be after start" in the add row as soon as End is changed to before Start', async () => {
+  const { user } = await renderPage(workLabels, [
+    { date: '2026-11-18', start: '09:00', end: '10:30', label: 'Client' },
+  ])
+  await findEntries(1)
+  await expectAddTimes('10:30', '10:30')
+
+  await fillAddForm(user, { end: '10:00' })
+
+  expect(addForm().getByText(endNotAfterStart)).toBeInTheDocument()
+  // A message below the fields, not help text of End.
+  expect(
+    addForm().getByRole('textbox', { name: 'End' }),
+  ).not.toHaveAccessibleDescription(endNotAfterStart)
+  expect(listedEntries()).toHaveLength(1)
+
+  await fillAddForm(user, { end: '11:00' })
+
+  expect(addForm().queryByText(endNotAfterStart)).not.toBeInTheDocument()
+})
+
+test('shows "End must be after start" in the add row when End is changed to equal Start', async () => {
+  const { user } = await renderPage(workLabels, [
+    { date: '2026-11-18', start: '09:00', end: '10:30', label: 'Client' },
+  ])
+  await findEntries(1)
+  await expectAddTimes('10:30', '10:30')
+
+  await fillAddForm(user, { end: '10:30' })
+
+  expect(addForm().getByText(endNotAfterStart)).toBeInTheDocument()
+})
+
+test('shows "End must be after start" in the add row when Start is moved past a changed End', async () => {
+  const { user } = await renderPage(workLabels, [
+    { date: '2026-11-18', start: '09:00', end: '10:30', label: 'Client' },
+  ])
+  await findEntries(1)
+  await expectAddTimes('10:30', '10:30')
+  await fillAddForm(user, { end: '11:00' })
+  expect(addForm().queryByText(endNotAfterStart)).not.toBeInTheDocument()
+
+  await fillAddForm(user, { start: '11:30' })
+
+  expect(addForm().getByText(endNotAfterStart)).toBeInTheDocument()
+})
+
+test('shows no "End must be after start" in the add row before End is changed', async () => {
+  const { user } = await renderPage(workLabels, [
+    { date: '2026-11-18', start: '09:00', end: '10:30', label: 'Client' },
+  ])
+  await findEntries(1)
+  await expectAddTimes('10:30', '10:30')
+  expect(addForm().queryByText(endNotAfterStart)).not.toBeInTheDocument()
+
+  await fillAddForm(user, { start: '11:00' })
+
+  await expectAddTimes('11:00', '11:00')
+  expect(addForm().queryByText(endNotAfterStart)).not.toBeInTheDocument()
+})
+
+test('shows "End must be after start" in the editor as soon as End is changed to before Start', async () => {
+  const { user, entries } = await renderPage(workLabels, twoEntries)
+  const [first] = await findEntries(2)
+  const before = await savedEntries(entries)
+  const editor = await openEntry(user, first.item)
+  expect(editor.queryByText(endNotAfterStart)).not.toBeInTheDocument()
+  const end = editor.getByRole('textbox', { name: 'End' })
+
+  await user.clear(end)
+  await user.type(end, '08:30')
+
+  expect(editor.getByText(endNotAfterStart)).toBeInTheDocument()
+  expect(await savedEntries(entries)).toEqual(before)
+
+  await user.clear(end)
+  await user.type(end, '10:30')
+
+  expect(editor.queryByText(endNotAfterStart)).not.toBeInTheDocument()
+})
+
+test('shows "End must be after start" in the editor as soon as Start is moved past End', async () => {
+  const { user, entries } = await renderPage(workLabels, twoEntries)
+  const [first] = await findEntries(2)
+  const before = await savedEntries(entries)
+  const editor = await openEntry(user, first.item)
+  const start = editor.getByRole('textbox', { name: 'Start' })
+
+  // End of an existing entry counts as changed from the start.
+  await user.clear(start)
+  await user.type(start, '10:30')
+
+  expect(editor.getByRole('textbox', { name: 'End' })).toHaveValue('10:00')
+  expect(editor.getByText(endNotAfterStart)).toBeInTheDocument()
+  expect(await savedEntries(entries)).toEqual(before)
+})
+
+test('shows the duration as help of End in the add row once End is after Start', async () => {
+  const { user } = await renderPage(workLabels, [
+    { date: '2026-11-18', start: '09:00', end: '10:30', label: 'Client' },
+  ])
+  await findEntries(1)
+  await expectAddTimes('10:30', '10:30')
+  const end = addForm().getByRole('textbox', { name: 'End' })
+  expect(end).not.toHaveAccessibleDescription(/Duration/)
+
+  await fillAddForm(user, { end: '12:00' })
+
+  expect(end).toHaveAccessibleDescription('Duration 1:30')
+
+  await fillAddForm(user, { end: '12' })
+
+  expect(end).not.toHaveAccessibleDescription(/Duration/)
+})
+
+test('shows the duration to midnight when End is 24:00', async () => {
+  const { user } = await renderPage(workLabels)
+  await screen.findByText('No entries')
+
+  await fillAddForm(user, { start: '22:30', end: '24:00' })
+
+  expect(
+    addForm().getByRole('textbox', { name: 'End' }),
+  ).toHaveAccessibleDescription('Duration 1:30')
+})
+
+test("shows the entry's duration as help of End in the editor and updates it", async () => {
+  const { user } = await renderPage(workLabels, [
+    ...twoEntries,
+    { date: '2026-11-18', start: '22:00', end: '00:00', label: 'Client' },
+  ])
+  const [first, , last] = await findEntries(3)
+
+  let editor = await openEntry(user, first.item)
+  let end = editor.getByRole('textbox', { name: 'End' })
+  expect(end).toHaveAccessibleDescription('Duration 1:00')
+
+  await user.clear(end)
+  await user.type(end, '10:45')
+
+  expect(end).toHaveAccessibleDescription('Duration 1:45')
+
+  editor = await openEntry(user, last.item)
+  end = editor.getByRole('textbox', { name: 'End' })
+  expect(end).toHaveAccessibleDescription('Duration 2:00')
+})
+
+test('shows "From previous entry" as help of Start when the add row starts at the previous end', async () => {
+  await renderPage(workLabels, [
+    { date: '2026-11-18', start: '09:00', end: '10:30', label: 'Client' },
+  ])
+  await findEntries(1)
+  await expectAddTimes('10:30', '10:30')
+
+  expect(
+    addForm().getByRole('textbox', { name: 'Start' }),
+  ).toHaveAccessibleDescription('From previous entry')
+})
+
+test('shows "Same as" and the date as help of Start when the add row takes the start of an earlier day', async () => {
+  await renderPage(workLabels, [
+    { date: '2026-11-11', start: '08:15', end: '09:00', label: 'Client' },
+    { date: '2026-11-17', start: '08:45', end: '09:00', label: 'Client' },
+  ])
+  await screen.findByText('No entries')
+  await expectAddTimes('08:15', '08:15')
+
+  expect(
+    addForm().getByRole('textbox', { name: 'Start' }),
+  ).toHaveAccessibleDescription('Same as Wed 11 Nov')
+})
+
+test('shows "Same as" the most recent earlier day when a week ago has no entries', async () => {
+  await renderPage(workLabels, [
+    { date: '2026-11-17', start: '08:45', end: '09:00', label: 'Client' },
+  ])
+  await screen.findByText('No entries')
+  await expectAddTimes('08:45', '08:45')
+
+  expect(
+    addForm().getByRole('textbox', { name: 'Start' }),
+  ).toHaveAccessibleDescription('Same as Tue 17 Nov')
+})
+
+test('shows "Default start" as help of Start when there is nothing to take the start from', async () => {
+  await renderPage(workLabels)
+  await screen.findByText('No entries')
+  await expectAddTimes('09:00', '09:00')
+
+  expect(
+    addForm().getByRole('textbox', { name: 'Start' }),
+  ).toHaveAccessibleDescription('Default start')
+})
+
+test('hides where the start comes from once Start is changed, and shows it again after Cancel', async () => {
+  const { user } = await renderPage(workLabels, [
+    { date: '2026-11-18', start: '09:00', end: '10:30', label: 'Client' },
+  ])
+  await findEntries(1)
+  await expectAddTimes('10:30', '10:30')
+  const start = () => addForm().getByRole('textbox', { name: 'Start' })
+  expect(start()).toHaveAccessibleDescription('From previous entry')
+
+  await fillAddForm(user, { start: '11:00' })
+
+  expect(start()).not.toHaveAccessibleDescription(/From previous entry/)
+  expect(addForm().queryByText('From previous entry')).not.toBeInTheDocument()
+
+  await user.click(addForm().getByRole('button', { name: 'Cancel' }))
+
+  await expectAddTimes('10:30', '10:30')
+  expect(start()).toHaveAccessibleDescription('From previous entry')
+})
+
+test('shows "From previous entry" in the next empty row after an add', async () => {
+  const { user } = await renderPage(workLabels)
+  await screen.findByText('No entries')
+  const start = () => addForm().getByRole('textbox', { name: 'Start' })
+  expect(start()).toHaveAccessibleDescription('Default start')
+
+  await addEntry(user, { start: '09:00', end: '10:00', label: 'Client' })
+
+  await findEntries(1)
+  await expectAddTimes('10:00', '10:00')
+  expect(start()).toHaveAccessibleDescription('From previous entry')
+})
+
+test('shows no prefill source in the editor of an existing entry', async () => {
+  const { user } = await renderPage(workLabels, twoEntries)
+  const [, second] = await findEntries(2)
+  // The empty row shows its source until an entry is opened.
+  expect(
+    addForm().getByRole('textbox', { name: 'Start' }),
+  ).toHaveAccessibleDescription('From previous entry')
+
+  const editor = await openEntry(user, second.item)
+
+  expect(
+    editor.getByRole('textbox', { name: 'Start' }),
+  ).not.toHaveAccessibleDescription(/previous entry|Same as|Default start/)
+  expect(editor.queryByText('From previous entry')).not.toBeInTheDocument()
+  expect(editor.queryByText(/^Same as/)).not.toBeInTheDocument()
+  expect(editor.queryByText('Default start')).not.toBeInTheDocument()
+})
+
+test('shows as help of Label whether the picked label is billable', async () => {
+  const { user } = await renderPage(workLabels)
+  await screen.findByText('No entries')
+  const label = addForm().getByRole('combobox', { name: 'Label' })
+  expect(label).not.toHaveAccessibleDescription(/billable/i)
+
+  await fillAddForm(user, { label: 'Client' })
+
+  expect(label).toHaveAccessibleDescription('Billable')
+
+  await fillAddForm(user, { label: 'Admin' })
+
+  expect(label).toHaveAccessibleDescription('Non-billable')
+
+  await fillAddForm(user, { label: 'Pick a label' })
+
+  expect(label).not.toHaveAccessibleDescription(/billable/i)
+})
+
+test("shows as help of Label in the editor whether the entry's label is billable", async () => {
+  const { user } = await renderPage(workLabels, twoEntries)
+  const [first] = await findEntries(2)
+
+  const editor = await openEntry(user, first.item)
+  const label = editor.getByRole('combobox', { name: 'Label' })
+
+  expect(label).toHaveAccessibleDescription('Billable')
+
+  await user.selectOptions(label, 'Admin')
+
+  expect(label).toHaveAccessibleDescription('Non-billable')
+})
+
+test("shows a deleted label's own billable setting in the editor", async () => {
+  const { user } = await renderPage(workLabels, twoEntries, ['Client', 'Admin'])
+  const [first, second] = await findEntries(2)
+
+  let editor = await openEntry(user, first.item)
+  expect(
+    editor.getByRole('combobox', { name: 'Label' }),
+  ).toHaveAccessibleDescription('Billable')
+
+  editor = await openEntry(user, second.item)
+  expect(
+    editor.getByRole('combobox', { name: 'Label' }),
+  ).toHaveAccessibleDescription('Non-billable')
+})
+
+test('shows no billable help in the editor for a label that is not stored', async () => {
+  const { user } = await renderWithUnknownLabel(
+    [],
+    [{ start: '09:00', end: '10:00', description: 'Orphan' }],
+  )
+  const [entry] = await findEntries(1)
+
+  const editor = await openEntry(user, entry.item)
+
+  expect(
+    editor.getByRole('combobox', { name: 'Label' }),
+  ).not.toHaveAccessibleDescription(/billable/i)
+  expect(editor.queryByText('Billable')).not.toBeInTheDocument()
+  expect(editor.queryByText('Non-billable')).not.toBeInTheDocument()
+})
+
+const standup: SeedEntry = {
+  date: '2026-11-18',
+  start: '10:00',
+  end: '11:00',
+  label: 'Client',
+  description: 'Standup',
+}
+
+test('warns in the add row which entry the new one overlaps, and still adds it', async () => {
+  const { user } = await renderPage(workLabels, [standup])
+  await findEntries(1)
+  await expectAddTimes('11:00', '11:00')
+  expect(addForm().queryByText(/^Overlaps with/)).not.toBeInTheDocument()
+
+  await fillAddForm(user, { start: '09:30', end: '10:30', label: 'Admin' })
+
+  expect(
+    addForm().getByText(
+      'Overlaps with “Standup” 10:00–11:00. You can still save.',
+    ),
+  ).toBeInTheDocument()
+  // A warning, not an error, and not help text of a field.
+  expect(addForm().queryByRole('alert')).not.toBeInTheDocument()
+  expect(
+    addForm().getByRole('textbox', { name: 'End' }),
+  ).not.toHaveAccessibleDescription(/Overlaps with/)
+
+  await user.click(addForm().getByRole('button', { name: 'Add' }))
+
+  const [added] = await findEntries(2)
+  expect(added).toMatchObject({ start: '09:30', end: '10:30', label: 'Admin' })
+  expect(addForm().queryByText(/^Overlaps with/)).not.toBeInTheDocument()
+})
+
+test('does not warn in the add row for an entry that only touches another', async () => {
+  const { user } = await renderPage(workLabels, [standup])
+  await findEntries(1)
+  await expectAddTimes('11:00', '11:00')
+
+  await fillAddForm(user, { end: '12:00' })
+
+  expect(
+    addForm().getByRole('textbox', { name: 'End' }),
+  ).toHaveAccessibleDescription('Duration 1:00')
+  expect(addForm().queryByText(/^Overlaps with/)).not.toBeInTheDocument()
+})
+
+test('warns in the editor which entry a changed time overlaps, and still saves it', async () => {
+  const { user, entries, ids } = await renderPage(workLabels, [
+    {
+      date: '2026-11-18',
+      start: '09:00',
+      end: '10:00',
+      label: 'Client',
+      description: 'Email',
+    },
+    standup,
+  ])
+  const [first] = await findEntries(2)
+  const editor = await openEntry(user, first.item)
+  expect(editor.queryByText(/^Overlaps with/)).not.toBeInTheDocument()
+  const end = editor.getByRole('textbox', { name: 'End' })
+
+  await user.clear(end)
+  await user.type(end, '10:30')
+
+  expect(
+    editor.getByText(
+      'Overlaps with “Standup” 10:00–11:00. You can still save.',
+    ),
+  ).toBeInTheDocument()
+  expect(editor.queryByRole('alert')).not.toBeInTheDocument()
+
+  await user.click(editor.getByRole('button', { name: 'Save' }))
+
+  await waitFor(() => {
+    expect(editorShown()).toBe(false)
+  })
+  expect(await savedEntries(entries)).toEqual([
+    {
+      time: '09:00-10:30',
+      labelId: ids.get('Client'),
+      description: 'Email',
+    },
+    {
+      time: '10:00-11:00',
+      labelId: ids.get('Client'),
+      description: 'Standup',
+    },
+  ])
+})
+
+test('the entry being edited does not overlap itself', async () => {
+  const { user } = await renderPage(workLabels, [standup])
+  const [first] = await findEntries(1)
+  const editor = await openEntry(user, first.item)
+  const end = editor.getByRole('textbox', { name: 'End' })
+
+  await user.clear(end)
+  await user.type(end, '11:30')
+
+  expect(end).toHaveAccessibleDescription('Duration 1:30')
+  expect(editor.queryByText(/^Overlaps with/)).not.toBeInTheDocument()
+})
+
+test('shows the overlap warning when an entry that already overlaps is opened', async () => {
+  const { user } = await renderPage(workLabels, [
+    {
+      date: '2026-11-18',
+      start: '09:00',
+      end: '10:30',
+      label: 'Admin',
+      description: 'Email',
+    },
+    standup,
+  ])
+  const [, second] = await findEntries(2)
+
+  const editor = await openEntry(user, second.item)
+
+  expect(
+    editor.getByText('Overlaps with “Email” 09:00–10:30. You can still save.'),
+  ).toBeInTheDocument()
+})
+
+test('names every overlapped entry in one warning, by start, by label when it has no description', async () => {
+  const { user } = await renderPage(workLabels, [
+    { date: '2026-11-18', start: '09:00', end: '10:00', label: 'Admin' },
+    standup,
+  ])
+  await findEntries(2)
+  await expectAddTimes('11:00', '11:00')
+
+  await fillAddForm(user, { start: '09:30', end: '10:30' })
+
+  expect(
+    addForm().getByText(
+      'Overlaps with “Admin” 09:00–10:00, “Standup” 10:00–11:00. You can still save.',
+    ),
+  ).toBeInTheDocument()
+})
+
+test('names an overlapped entry without description and with a label that is not stored "(unknown label)"', async () => {
+  const { user } = await renderWithUnknownLabel(
+    [],
+    [{ start: '10:00', end: '11:00' }],
+  )
+  await findEntries(1)
+  await expectAddTimes('11:00', '11:00')
+
+  await fillAddForm(user, { start: '09:30', end: '10:30' })
+
+  expect(
+    addForm().getByText(
+      'Overlaps with “(unknown label)” 10:00–11:00. You can still save.',
+    ),
+  ).toBeInTheDocument()
+})
+
+test('shows an overlapped entry ending at midnight as ending at 24:00 in the warning', async () => {
+  const { user } = await renderPage(workLabels, [
+    {
+      date: '2026-11-18',
+      start: '22:00',
+      end: '00:00',
+      label: 'Client',
+      description: 'Late',
+    },
+  ])
+  await findEntries(1)
+  await expectAddTimes('', '')
+
+  await fillAddForm(user, { start: '23:00', end: '24:00' })
+
+  expect(
+    addForm().getByText(
+      'Overlaps with “Late” 22:00–24:00. You can still save.',
+    ),
+  ).toBeInTheDocument()
+})
+
+// Durations are real time worked, also on the nights the clocks change in
+// Europe/Amsterdam (specs/clock-changes.feature).
+
+/**
+ * Renders the page like `renderPage`, but with today at noon in Amsterdam on
+ * this date, so the page opens on that day.
+ */
+async function renderOnDay(date: string, seedEntries: SeedEntry[] = []) {
+  const dayClock = fixedClock(
+    Temporal.PlainDate.from(date)
+      .toZonedDateTime({ timeZone, plainTime: '12:00' })
+      .toInstant(),
+  )
+  const entryRepository = new InMemoryRepository<Entry>()
+  const labels = createLabelService(
+    new InMemoryRepository<Label>(),
+    entryRepository,
+    dayClock,
+  )
+  const entries = createEntryService(entryRepository, dayClock)
+  const ids = new Map<string, string>()
+  for (const { name, billable } of workLabels) {
+    const created = await labels.create(name, { billable })
+    if (!created.ok) throw new Error(`could not seed label ${name}`)
+    ids.set(name, created.value.id)
+  }
+  for (const seed of seedEntries) {
+    const added = await entries.add({
+      date: Temporal.PlainDate.from(seed.date),
+      start: Temporal.PlainTime.from(seed.start),
+      end: Temporal.PlainTime.from(seed.end),
+      labelId: ids.get(seed.label) ?? '',
+      description: seed.description ?? '',
+      timeZone,
+    })
+    if (!added.ok) throw new Error(`could not seed entry: ${added.error}`)
+  }
+  render(
+    <EntriesPage
+      entries={entries}
+      labels={labels}
+      clock={dayClock}
+      timeZone={timeZone}
+    />,
+  )
+  await screen.findByRole('heading', { name: 'Entries' })
+  return { user: userEvent.setup() }
+}
+
+test('shows the real duration in the editor on the night the clocks go forward', async () => {
+  const { user } = await renderOnDay('2026-03-29', [
+    { date: '2026-03-29', start: '01:00', end: '04:00', label: 'Client' },
+  ])
+  expect(
+    screen.getByRole('heading', { name: 'Sunday 29 March 2026' }),
+  ).toBeInTheDocument()
+  const [entry] = await findEntries(1)
+  expect(within(entry.item).getByText('2:00')).toBeInTheDocument()
+
+  const editor = await openEntry(user, entry.item)
+
+  expect(
+    editor.getByRole('textbox', { name: 'End' }),
+  ).toHaveAccessibleDescription('Duration 2:00')
+})
+
+test('shows the real duration in the editor on the night the clocks go back', async () => {
+  const { user } = await renderOnDay('2026-10-25', [
+    { date: '2026-10-25', start: '01:00', end: '04:00', label: 'Client' },
+  ])
+  expect(
+    screen.getByRole('heading', { name: 'Sunday 25 October 2026' }),
+  ).toBeInTheDocument()
+  const [entry] = await findEntries(1)
+  expect(within(entry.item).getByText('4:00')).toBeInTheDocument()
+
+  const editor = await openEntry(user, entry.item)
+
+  expect(
+    editor.getByRole('textbox', { name: 'End' }),
+  ).toHaveAccessibleDescription('Duration 4:00')
+})
+
+test('shows the real duration in the add row on the night the clocks go forward', async () => {
+  const { user } = await renderOnDay('2026-03-29')
+  await screen.findByText('No entries')
+
+  await fillAddForm(user, { start: '01:00', end: '04:00' })
+
+  expect(
+    addForm().getByRole('textbox', { name: 'End' }),
+  ).toHaveAccessibleDescription('Duration 2:00')
+})
+
+test('shows the real duration in the add row on the night the clocks go back', async () => {
+  const { user } = await renderOnDay('2026-10-25')
+  await screen.findByText('No entries')
+
+  await fillAddForm(user, { start: '01:00', end: '04:00' })
+
+  expect(
+    addForm().getByRole('textbox', { name: 'End' }),
+  ).toHaveAccessibleDescription('Duration 4:00')
+})

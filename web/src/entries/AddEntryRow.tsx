@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react'
 import type { Temporal } from 'temporal-polyfill'
-import type { EntryService, Prefill } from '../domain/entries.ts'
+import type { EntryService, Prefill, PrefillSource } from '../domain/entries.ts'
 import type { Label } from '../domain/records.ts'
 import { formatTime, MIDNIGHT } from '../domain/timeText.ts'
-import type { Draft, DraftFields } from './EntryForm.tsx'
+import type { Draft, DraftFields, TimesWarning } from './EntryForm.tsx'
 import { EntryForm } from './EntryForm.tsx'
 
 interface AddEntryRowProps {
@@ -15,6 +15,8 @@ interface AddEntryRowProps {
   timeZone: string
   /** The times an untouched row shows; empty fields when undefined. */
   prefill: Prefill | undefined
+  /** Warns about the typed times, e.g. which entries they overlap. */
+  warn: TimesWarning
   /** Called after an entry was added. */
   onAdded: () => void
 }
@@ -40,6 +42,30 @@ function untouchedDraft(prefill: Prefill | undefined): TypedDraft {
   }
 }
 
+/** Where a prefilled start comes from, e.g. "From previous entry" or "Same as Wed 11 Nov". */
+function sourceText(source: PrefillSource): string {
+  switch (source.kind) {
+    case 'previous':
+      return 'From previous entry'
+    case 'same-as': {
+      const weekday = source.date.toLocaleString('en-GB', { weekday: 'short' })
+      const month = source.date.toLocaleString('en-GB', { month: 'short' })
+      return `Same as ${weekday} ${source.date.day} ${month}`
+    }
+    case 'default':
+      return 'Default start'
+  }
+}
+
+/** Where the start comes from, while Start shows the prefilled start. */
+function startHelpOf(
+  prefill: Prefill | undefined,
+  startText: string,
+): string | undefined {
+  if (!prefill || startText !== formatTime(prefill.start)) return undefined
+  return sourceText(prefill.source)
+}
+
 /**
  * The end an untouched End shows: the start as typed, like the prefill, whose end equals its start.
  * A prefilled end that is left empty stays empty.
@@ -59,6 +85,7 @@ export function AddEntryRow({
   labels,
   timeZone,
   prefill,
+  warn,
   onAdded,
 }: AddEntryRowProps) {
   // Undefined while untouched, so a new prefill shows; set on the first change.
@@ -71,7 +98,11 @@ export function AddEntryRow({
   }
   const labelChoices = [
     { value: '', name: 'Pick a label' },
-    ...labels.map((label) => ({ value: label.id, name: label.name })),
+    ...labels.map((label) => ({
+      value: label.id,
+      name: label.name,
+      billable: label.billable,
+    })),
   ]
 
   function added() {
@@ -86,8 +117,13 @@ export function AddEntryRow({
         name="Add entry"
         submitText="Add"
         draft={draft}
+        date={date}
+        timeZone={timeZone}
         onChange={(changes) => setTyped({ ...current, ...changes })}
         labelChoices={labelChoices}
+        endTouched={current.endText !== undefined}
+        startHelp={startHelpOf(prefill, current.startText)}
+        warn={warn}
         save={(fields: DraftFields) =>
           entries.add({ ...fields, date, timeZone })
         }

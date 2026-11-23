@@ -25,11 +25,27 @@ export type EntryChanges = Partial<
 >
 
 /** The date, wall-clock times and time zone of an entry. */
-type TimeRange = Pick<NewEntry, 'date' | 'start' | 'end' | 'timeZone'>
+export type TimeRange = Pick<NewEntry, 'date' | 'start' | 'end' | 'timeZone'>
+
+/** Minutes since the start of the day of a wall-clock time. */
+function minutesOf(time: Temporal.PlainTime): number {
+  return time.hour * 60 + time.minute
+}
 
 /** Minutes since the start of the day of a wall-clock end time; an end of 00:00 is 24:00. */
 function endMinutesOf(end: Temporal.PlainTime): number {
-  return end.equals(MIDNIGHT) ? 24 * 60 : end.hour * 60 + end.minute
+  return end.equals(MIDNIGHT) ? 24 * 60 : minutesOf(end)
+}
+
+/**
+ * Whether an end time is after a start time on the clock of one day; an end of 00:00 is 24:00.
+ * Clock changes do not matter, so 22:00–00:30 never is.
+ */
+export function endsAfterStart(
+  start: Temporal.PlainTime,
+  end: Temporal.PlainTime,
+): boolean {
+  return endMinutesOf(end) > minutesOf(start)
 }
 
 /** Today's date in a time zone at the given moment. */
@@ -48,7 +64,7 @@ function validate(
   { date, start, end, labelId, timeZone }: NewEntry,
   now: Temporal.Instant,
 ): EntryError | undefined {
-  if (endMinutesOf(end) <= start.hour * 60 + start.minute) {
+  if (!endsAfterStart(start, end)) {
     return 'end-not-after-start'
   }
   if (labelId === '') return 'no-label'
@@ -92,11 +108,30 @@ export function dateOf(entry: Entry): Temporal.PlainDate {
   return zonedOf(entry, entry.start).toPlainDate()
 }
 
+/** The whole minutes between two instants. */
+function minutesBetween({
+  start,
+  end,
+}: {
+  start: string
+  end: string
+}): number {
+  return Temporal.Instant.from(start)
+    .until(Temporal.Instant.from(end))
+    .total('minutes')
+}
+
 /** The duration of an entry in whole minutes, between its start and end instants. */
 export function durationOf(entry: Entry): number {
-  return Temporal.Instant.from(entry.start)
-    .until(Temporal.Instant.from(entry.end))
-    .total('minutes')
+  return minutesBetween(entry)
+}
+
+/**
+ * The duration in whole minutes an entry with these times would have: the real time between its instants,
+ * so an hour less or more on the nights the clocks change.
+ */
+export function durationOfRange(range: TimeRange): number {
+  return minutesBetween(instantsOf(range))
 }
 
 /** The start of an entry as a wall-clock time in its own time zone. */

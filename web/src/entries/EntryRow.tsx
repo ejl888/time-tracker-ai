@@ -1,7 +1,7 @@
-import { durationOf, endTimeOf, startTimeOf } from '../domain/entries.ts'
+import { durationOf } from '../domain/entries.ts'
 import type { Entry, Label } from '../domain/records.ts'
-import { formatEndTime, formatTime } from '../domain/timeText.ts'
 import { formatMinutes } from '../domain/workedHours.ts'
+import { timeRangeText } from './entryMessages.ts'
 
 interface EntryRowProps {
   entry: Entry
@@ -22,7 +22,6 @@ function chipText(label: Label | undefined): string {
 /** One listed entry, read-only: its times, duration, description and label. Clicking it opens its editor. */
 export function EntryRow({ entry, label, overlaps, onOpen }: EntryRowProps) {
   const billable = label?.billable === true
-  const time = `${formatTime(startTimeOf(entry))}–${formatEndTime(endTimeOf(entry))}`
 
   return (
     <button
@@ -30,7 +29,7 @@ export function EntryRow({ entry, label, overlaps, onOpen }: EntryRowProps) {
       className={billable ? 'entry' : 'entry nonbill'}
       onClick={onOpen}
     >
-      <span className="time num">{time}</span>
+      <span className="time num">{timeRangeText(entry)}</span>
       <span className="dur num">{formatMinutes(durationOf(entry))}</span>
       <span className="desc">
         {entry.description || '—'}
