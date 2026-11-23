@@ -189,6 +189,28 @@ export function overlaps(entries: Entry[]): boolean {
   )
 }
 
+/** Whether two time spans overlap: each starts before the other ends, so adjacent spans do not. */
+function spansOverlap(
+  a: { start: string; end: string },
+  b: { start: string; end: string },
+): boolean {
+  return isBefore(a.start, b.end) && isBefore(b.start, a.end)
+}
+
+/** The ids of the entries that are not deleted and overlap another such entry; adjacent entries do not overlap. */
+export function overlappingIds(entries: Entry[]): Set<string> {
+  const active = entries.filter((entry) => !entry.deleted)
+  return new Set(
+    active
+      .filter((entry) =>
+        active.some(
+          (other) => other.id !== entry.id && spansOverlap(entry, other),
+        ),
+      )
+      .map((entry) => entry.id),
+  )
+}
+
 /** Whether an entry is not deleted and falls on the date. */
 export function isActiveOn(entry: Entry, date: Temporal.PlainDate): boolean {
   return !entry.deleted && dateOf(entry).equals(date)
@@ -209,12 +231,7 @@ export function overlapping(
 ): Entry[] {
   const range = instantsOf(candidate)
   return activeOn(entries, candidate.date)
-    .filter(
-      (entry) =>
-        entry.id !== candidate.id &&
-        isBefore(entry.start, range.end) &&
-        isBefore(range.start, entry.end),
-    )
+    .filter((entry) => entry.id !== candidate.id && spansOverlap(entry, range))
     .sort(byStart)
 }
 

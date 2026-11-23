@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Temporal } from 'temporal-polyfill'
 import type { Clock } from '../domain/clock.ts'
 import type { EntryService, Prefill } from '../domain/entries.ts'
-import { overlapping, overlaps, todayIn } from '../domain/entries.ts'
+import { overlapping, overlappingIds, todayIn } from '../domain/entries.ts'
 import type { LabelService } from '../domain/labels.ts'
 import type { Entry, Label } from '../domain/records.ts'
 import { formatMinutes, workedMinutesOn } from '../domain/workedHours.ts'
@@ -190,13 +190,6 @@ interface DayEntriesProps {
   onEdited: () => void
 }
 
-/** Whether an entry overlaps another of the entries. */
-function overlapsAnother(entry: Entry, entries: Entry[]): boolean {
-  return entries.some(
-    (other) => other.id !== entry.id && overlaps([entry, other]),
-  )
-}
-
 /** The worked hours, overlap warning and list of a loaded day, with the open entry as an editor. */
 function DayEntries({
   day,
@@ -206,6 +199,7 @@ function DayEntries({
   onEdited,
 }: DayEntriesProps) {
   const worked = workedMinutesOn(day.date, day.entries, day.usedLabels)
+  const overlapIds = overlappingIds(day.entries)
   const labelOf = (entry: Entry) =>
     day.usedLabels.find((label) => label.id === entry.labelId)
 
@@ -214,7 +208,7 @@ function DayEntries({
       <div className="day-head">
         <p className="day-total num">{`Worked ${formatMinutes(worked)}`}</p>
       </div>
-      {overlaps(day.entries) && (
+      {overlapIds.size > 0 && (
         <p className="msg warn" role="status">
           Some entries overlap
         </p>
@@ -243,7 +237,7 @@ function DayEntries({
                 <EntryRow
                   entry={entry}
                   label={labelOf(entry)}
-                  overlaps={overlapsAnother(entry, day.entries)}
+                  overlaps={overlapIds.has(entry.id)}
                   onOpen={() => onEdit(entry.id)}
                 />
               )}

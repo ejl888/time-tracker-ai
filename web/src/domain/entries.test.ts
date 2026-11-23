@@ -8,6 +8,7 @@ import {
   durationOfRange,
   endsAfterStart,
   overlapping,
+  overlappingIds,
   prefillFor,
 } from './entries.ts'
 import type { NewEntry } from './entries.ts'
@@ -250,4 +251,33 @@ test('the duration of a range is an hour longer on the night the clocks go back'
   }
 
   expect(durationOfRange(range)).toBe(240)
+})
+
+test('overlapping ids are those of the entries that overlap another entry', async () => {
+  const first = await added({ start: time('09:00'), end: time('10:30') })
+  const second = await added({ start: time('10:00'), end: time('11:00') })
+  await added({ start: time('11:00'), end: time('12:00') })
+
+  const result = overlappingIds(await entries.all())
+
+  expect(result).toEqual(new Set([first.id, second.id]))
+})
+
+test('touching entries have no overlapping ids', async () => {
+  await added({ start: time('10:00'), end: time('11:00') })
+  await added({ start: time('11:00'), end: time('12:00') })
+
+  const result = overlappingIds(await entries.all())
+
+  expect(result).toEqual(new Set())
+})
+
+test('a deleted entry is ignored for overlapping ids', async () => {
+  await added({ start: time('10:00'), end: time('11:00') })
+  const deleted = await added({ start: time('10:30'), end: time('11:30') })
+  await service.remove(deleted.id)
+
+  const result = overlappingIds(await entries.all())
+
+  expect(result).toEqual(new Set())
 })
