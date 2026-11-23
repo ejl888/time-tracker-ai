@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { durationOf } from '../domain/entries.ts'
 import type { Entry, Label } from '../domain/records.ts'
 import { formatMinutes } from '../domain/workedHours.ts'
@@ -9,6 +10,8 @@ interface EntryRowProps {
   label: Label | undefined
   /** Whether the entry overlaps another entry of its day. */
   overlaps: boolean
+  /** Whether the row gets focus when it appears, e.g. after its editor closed. */
+  focused: boolean
   /** Called when the row is clicked, to open its editor. */
   onOpen: () => void
 }
@@ -20,12 +23,24 @@ function chipText(label: Label | undefined): string {
 }
 
 /** One listed entry, read-only: its times, duration, description and label. Clicking it opens its editor. */
-export function EntryRow({ entry, label, overlaps, onOpen }: EntryRowProps) {
+export function EntryRow({
+  entry,
+  label,
+  overlaps,
+  focused,
+  onOpen,
+}: EntryRowProps) {
   const billable = label?.billable === true
+  const ref = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (focused) ref.current?.focus()
+  }, [focused])
 
   return (
     <button
       type="button"
+      ref={ref}
       className={billable ? 'entry' : 'entry nonbill'}
       onClick={onOpen}
     >

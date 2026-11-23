@@ -117,6 +117,7 @@ interface EntryFormProps {
   onDone: () => void
   /** Called on Cancel or Esc. */
   onCancel: () => void
+  startRef?: Ref<HTMLInputElement>
   endRef?: Ref<HTMLInputElement>
   descriptionRef?: Ref<HTMLInputElement>
 }
@@ -143,6 +144,7 @@ export function EntryForm({
   remove,
   onDone,
   onCancel,
+  startRef,
   endRef,
   descriptionRef,
 }: EntryFormProps) {
@@ -201,6 +203,7 @@ export function EntryForm({
           <input
             id={`${id}-start`}
             className="num"
+            ref={startRef}
             aria-describedby={`${id}-start-help`}
             value={startText}
             onChange={(e) => onChange({ startText: e.target.value })}

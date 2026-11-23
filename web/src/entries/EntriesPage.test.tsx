@@ -1984,3 +1984,61 @@ test('going to another day closes an open editor and shows the empty row of that
   expect(editorShown()).toBe(false)
   await expectAddTimes('10:00', '10:00')
 })
+
+test("puts focus on the saved entry's row after Save, also when it moved", async () => {
+  const { user } = await renderPage(workLabels, twoEntries)
+  const [, second] = await findEntries(2)
+  const editor = await openEntry(user, second.item)
+  const start = editor.getByRole('textbox', { name: 'Start' })
+  await user.clear(start)
+  await user.type(start, '08:00')
+
+  await user.click(editor.getByRole('button', { name: 'Save' }))
+
+  await waitFor(() =>
+    expect(listedEntries().map(({ description }) => description)).toEqual([
+      'Filing',
+      'Email',
+    ]),
+  )
+  await waitFor(() => expect(rowOf('Filing')).toHaveFocus())
+})
+
+test("puts focus on the entry's row after Cancel", async () => {
+  const { user } = await renderPage(workLabels, twoEntries)
+  const [first] = await findEntries(2)
+  const editor = await openEntry(user, first.item)
+
+  await user.click(editor.getByRole('button', { name: 'Cancel' }))
+
+  expect(editorShown()).toBe(false)
+  await waitFor(() => expect(rowOf('Email')).toHaveFocus())
+})
+
+test("puts focus on the entry's row after Esc", async () => {
+  const { user } = await renderPage(workLabels, twoEntries)
+  const [, second] = await findEntries(2)
+  await openEntry(user, second.item)
+
+  await user.keyboard('{Escape}')
+
+  expect(editorShown()).toBe(false)
+  await waitFor(() => expect(rowOf('Filing')).toHaveFocus())
+})
+
+test('after adding an entry that ends at 24:00 the next empty row is empty with focus on Start', async () => {
+  const { user } = await renderPage(workLabels, [
+    { date: '2026-11-18', start: '09:00', end: '10:00', label: 'Client' },
+  ])
+  await findEntries(1)
+  await expectAddTimes('10:00', '10:00')
+
+  await addEntry(user, { end: '24:00', label: 'Client' })
+
+  const found = await findEntries(2)
+  expect(found[1]).toMatchObject({ start: '10:00', end: '24:00' })
+  await expectAddTimes('', '')
+  await waitFor(() => {
+    expect(addForm().getByRole('textbox', { name: 'Start' })).toHaveFocus()
+  })
+})
