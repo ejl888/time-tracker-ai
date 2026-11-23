@@ -2,14 +2,14 @@ import { useState } from 'react'
 import { Temporal } from 'temporal-polyfill'
 import { systemClock } from './domain/clock.ts'
 import { EntriesPage } from './entries/EntriesPage.tsx'
-import { LabelsPage } from './labels/LabelsPage.tsx'
 import { createServices } from './services.ts'
+import { SettingsPage } from './settings/SettingsPage.tsx'
 
-type Screen = 'entries' | 'labels'
+type Screen = 'entries' | 'settings'
 
 const screens: { screen: Screen; title: string }[] = [
   { screen: 'entries', title: 'Entries' },
-  { screen: 'labels', title: 'Labels' },
+  { screen: 'settings', title: 'Settings' },
 ]
 
 /** Services and the time zone, set up once when the app starts. */
@@ -46,7 +46,12 @@ function App() {
           timeZone={app.timeZone}
         />
       ) : (
-        <LabelsPage labels={app.labels} />
+        <SettingsPage
+          contracts={app.contracts}
+          labels={app.labels}
+          clock={systemClock}
+          timeZone={app.timeZone}
+        />
       )}
     </main>
   )
