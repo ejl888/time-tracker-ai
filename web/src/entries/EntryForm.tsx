@@ -2,13 +2,21 @@ import { useId, useState } from 'react'
 import type { FormEvent, Ref } from 'react'
 import type { Temporal } from 'temporal-polyfill'
 import type { EntryError, NewEntry, TimeRange } from '../domain/entries.ts'
-import { durationOfRange, timesInOrder } from '../domain/entries.ts'
+import {
+  clockChangeNotes,
+  durationOfRange,
+  timesInOrder,
+} from '../domain/entries.ts'
 import type { Entry } from '../domain/records.ts'
 import type { Result } from '../domain/result.ts'
 import { parseEndTime, parseTime } from '../domain/timeText.ts'
 import { formatMinutes } from '../domain/workedHours.ts'
 import { cancelOnEscape } from './cancelOnEscape.ts'
-import { entryErrorMessage, INVALID_TIME_MESSAGE } from './entryMessages.ts'
+import {
+  clockChangeMessage,
+  entryErrorMessage,
+  INVALID_TIME_MESSAGE,
+} from './entryMessages.ts'
 
 export type EntryResult = Result<Entry, EntryError>
 
@@ -47,6 +55,8 @@ interface DraftCheck {
   /** Why End is wrong (not after Start), once End was changed. */
   endError?: string
   warning?: string | undefined
+  /** Warnings about a Start or End on the night the clocks change, start first. */
+  clockChanges?: string[]
 }
 
 /** The draft with its times parsed, or undefined when Start or End is not a valid time. */
@@ -74,15 +84,19 @@ function checkDraft(
   if (!fields) return {}
   const { start, end } = fields
   const range = { ...place, start, end }
+  const clockChanges = clockChangeNotes(range).map((note) =>
+    clockChangeMessage(note, place.date),
+  )
   if (timesInOrder(range)) {
     return {
       duration: `Duration ${formatMinutes(durationOfRange(range))}`,
       warning: warn?.(start, end),
+      clockChanges,
     }
   }
   return endTouched
-    ? { endError: entryErrorMessage('end-not-after-start') }
-    : {}
+    ? { endError: entryErrorMessage('end-not-after-start'), clockChanges }
+    : { clockChanges }
 }
 
 /** "Billable" or "Non-billable" for the picked label; undefined when it is no stored label. */
@@ -126,7 +140,7 @@ interface EntryFormProps {
  * prototype's editor. Submit or Enter saves; Cancel or Esc cancels; Delete, when given, takes two clicks.
  * A rejected save or delete shows why. While you type, the fields show help (Start's `startHelp`, the duration
  * under End, billable or not under Label), and the messages show an end that is not after the start once End was
- * changed, and the warning from `warn`.
+ * changed, the warning from `warn`, and a Start or End that doesn't exist or occurs twice as the clocks change.
  */
 export function EntryForm({
   name,
@@ -263,6 +277,11 @@ export function EntryForm({
           <p className="msg err">{check.endError}</p>
         )}
         {check.warning && <p className="msg warn">{check.warning}</p>}
+        {check.clockChanges?.map((warning) => (
+          <p key={warning} className="msg warn">
+            {warning}
+          </p>
+        ))}
       </div>
       <div className="actions">
         <button className="btn primary small" type="submit">

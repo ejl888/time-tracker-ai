@@ -2117,3 +2117,173 @@ test('shows "End must be after start" and rejects the save in the editor when th
     { start: '01:00', end: '04:00', label: 'Client' },
   ])
 })
+
+// On the night the clocks go forward 02:00–02:59 doesn't exist and becomes an
+// hour later; on the night they go back it occurs twice and the first one is
+// used. The messages area warns about such a Start or End, like the overlap
+// warning: a warning, not an error (specs/clock-changes.feature).
+
+/** Any clock-change warning. */
+const clockChangeWarning = /doesn't exist on|occurs twice on/
+
+test("warns in the add row that a start doesn't exist as the clocks go forward", async () => {
+  const { user } = await renderOnDay('2026-03-29')
+  await screen.findByText('No entries')
+
+  await fillAddForm(user, { start: '02:30', end: '04:00' })
+
+  expect(
+    addForm().getByText(
+      "02:30 doesn't exist on Sun 29 Mar (the clocks go forward); it's saved as 03:30.",
+    ),
+  ).toBeInTheDocument()
+  // A warning, not an error, and not help text of a field.
+  expect(addForm().queryByRole('alert')).not.toBeInTheDocument()
+  expect(
+    addForm().getByRole('textbox', { name: 'Start' }),
+  ).not.toHaveAccessibleDescription(clockChangeWarning)
+})
+
+test('warns in the add row that a start occurs twice as the clocks go back', async () => {
+  const { user } = await renderOnDay('2026-10-25')
+  await screen.findByText('No entries')
+
+  await fillAddForm(user, { start: '02:30', end: '04:00' })
+
+  expect(
+    addForm().getByText(
+      '02:30 occurs twice on Sun 25 Oct (the clocks go back); the first one is used.',
+    ),
+  ).toBeInTheDocument()
+  expect(addForm().queryByRole('alert')).not.toBeInTheDocument()
+})
+
+test("warns in the add row that an end doesn't exist as the clocks go forward", async () => {
+  const { user } = await renderOnDay('2026-03-29')
+  await screen.findByText('No entries')
+
+  await fillAddForm(user, { start: '01:00', end: '02:30' })
+
+  expect(
+    addForm().getByText(
+      "02:30 doesn't exist on Sun 29 Mar (the clocks go forward); it's saved as 03:30.",
+    ),
+  ).toBeInTheDocument()
+  expect(addForm().getAllByText(clockChangeWarning)).toHaveLength(1)
+})
+
+test("warns in the add row for both a start and an end that don't exist, start first", async () => {
+  const { user } = await renderOnDay('2026-03-29')
+  await screen.findByText('No entries')
+
+  await fillAddForm(user, { start: '02:15', end: '02:45' })
+
+  const startWarning = addForm().getByText(
+    "02:15 doesn't exist on Sun 29 Mar (the clocks go forward); it's saved as 03:15.",
+  )
+  const endWarning = addForm().getByText(
+    "02:45 doesn't exist on Sun 29 Mar (the clocks go forward); it's saved as 03:45.",
+  )
+  expect(
+    startWarning.compareDocumentPosition(endWarning) &
+      Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy()
+  expect(addForm().getAllByText(clockChangeWarning)).toHaveLength(2)
+})
+
+test("warns in the editor that a changed start doesn't exist as the clocks go forward", async () => {
+  const { user } = await renderOnDay('2026-03-29', [
+    { date: '2026-03-29', start: '01:00', end: '04:00', label: 'Client' },
+  ])
+  const [entry] = await findEntries(1)
+  const editor = await openEntry(user, entry.item)
+  expect(editor.queryByText(clockChangeWarning)).not.toBeInTheDocument()
+  const start = editor.getByRole('textbox', { name: 'Start' })
+
+  await user.clear(start)
+  await user.type(start, '02:30')
+
+  expect(
+    editor.getByText(
+      "02:30 doesn't exist on Sun 29 Mar (the clocks go forward); it's saved as 03:30.",
+    ),
+  ).toBeInTheDocument()
+  expect(editor.queryByRole('alert')).not.toBeInTheDocument()
+})
+
+test("adds an entry despite the warning that its start doesn't exist, saved an hour later", async () => {
+  const { user } = await renderOnDay('2026-03-29')
+  await screen.findByText('No entries')
+
+  await addEntry(user, { start: '02:30', end: '04:00', label: 'Client' })
+
+  const [added] = await findEntries(1)
+  expect(added).toMatchObject({ start: '03:30', end: '04:00', label: 'Client' })
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+})
+
+test('shows no clock-change warning for 02:30 on a normal day', async () => {
+  const { user } = await renderPage(workLabels)
+  await screen.findByText('No entries')
+
+  await fillAddForm(user, { start: '02:30', end: '04:00' })
+
+  expect(
+    addForm().getByRole('textbox', { name: 'End' }),
+  ).toHaveAccessibleDescription('Duration 1:30')
+  expect(addForm().queryByText(clockChangeWarning)).not.toBeInTheDocument()
+})
+
+test('shows no clock-change warning for normal times on a clock-change day', async () => {
+  const { user } = await renderOnDay('2026-03-29')
+  await screen.findByText('No entries')
+
+  await fillAddForm(user, { start: '01:00', end: '04:00' })
+
+  expect(
+    addForm().getByRole('textbox', { name: 'End' }),
+  ).toHaveAccessibleDescription('Duration 2:00')
+  expect(addForm().queryByText(clockChangeWarning)).not.toBeInTheDocument()
+})
+
+test('the clock-change warning goes away when the time is changed to a normal one', async () => {
+  const { user } = await renderOnDay('2026-03-29')
+  await screen.findByText('No entries')
+
+  await fillAddForm(user, { start: '02:30', end: '04:00' })
+  expect(addForm().getByText(clockChangeWarning)).toBeInTheDocument()
+
+  await fillAddForm(user, { start: '01:30' })
+
+  expect(addForm().queryByText(clockChangeWarning)).not.toBeInTheDocument()
+})
+
+test('warns once in the add row when the prefilled start and end are the same time that occurs twice', async () => {
+  await renderOnDay('2026-10-25', [
+    { date: '2026-10-25', start: '01:00', end: '02:30', label: 'Client' },
+  ])
+  await findEntries(1)
+  await expectAddTimes('02:30', '02:30')
+
+  expect(
+    addForm().getAllByText(
+      '02:30 occurs twice on Sun 25 Oct (the clocks go back); the first one is used.',
+    ),
+  ).toHaveLength(1)
+})
+
+test('warns right away in the editor of an entry whose start occurs twice', async () => {
+  const { user } = await renderOnDay('2026-10-25', [
+    { date: '2026-10-25', start: '02:30', end: '04:00', label: 'Client' },
+  ])
+  const [entry] = await findEntries(1)
+
+  const editor = await openEntry(user, entry.item)
+
+  expect(
+    editor.getByText(
+      '02:30 occurs twice on Sun 25 Oct (the clocks go back); the first one is used.',
+    ),
+  ).toBeInTheDocument()
+  expect(editor.queryByRole('alert')).not.toBeInTheDocument()
+})
