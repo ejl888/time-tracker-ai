@@ -2,7 +2,7 @@ import { useId, useState } from 'react'
 import type { FormEvent, Ref } from 'react'
 import type { Temporal } from 'temporal-polyfill'
 import type { EntryError, NewEntry, TimeRange } from '../domain/entries.ts'
-import { durationOfRange, endsAfterStart } from '../domain/entries.ts'
+import { durationOfRange, timesInOrder } from '../domain/entries.ts'
 import type { Entry } from '../domain/records.ts'
 import type { Result } from '../domain/result.ts'
 import { parseEndTime, parseTime } from '../domain/timeText.ts'
@@ -42,9 +42,9 @@ export type TimesWarning = (
 
 /** The help texts and live messages for a draft, as it is typed. */
 interface DraftCheck {
-  /** "Duration H:MM", when End is after Start. */
+  /** "Duration H:MM", when the times are in order. */
   duration?: string
-  /** Why End is wrong, once End was changed. */
+  /** Why End is wrong (not after Start), once End was changed. */
   endError?: string
   warning?: string | undefined
 }
@@ -73,11 +73,10 @@ function checkDraft(
   const fields = parseDraft(draft)
   if (!fields) return {}
   const { start, end } = fields
-  if (endsAfterStart(start, end)) {
-    const minutes = durationOfRange({ ...place, start, end })
+  const range = { ...place, start, end }
+  if (timesInOrder(range)) {
     return {
-      // A start in the spring-forward gap moves on and can pass the end.
-      ...(minutes > 0 && { duration: `Duration ${formatMinutes(minutes)}` }),
+      duration: `Duration ${formatMinutes(durationOfRange(range))}`,
       warning: warn?.(start, end),
     }
   }

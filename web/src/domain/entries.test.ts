@@ -281,3 +281,17 @@ test('a deleted entry is ignored for overlapping ids', async () => {
 
   expect(result).toEqual(new Set())
 })
+
+test('a start that moves past the end as the clocks go forward is rejected', async () => {
+  const result = await service.add({
+    date: Temporal.PlainDate.from('2026-03-29'),
+    start: time('02:30'),
+    end: time('03:00'),
+    labelId: 'label-1',
+    description: 'Work',
+    timeZone: 'Europe/Amsterdam',
+  })
+
+  expect(result).toEqual({ ok: false, error: 'end-not-after-start' })
+  expect(await entries.all()).toEqual([])
+})

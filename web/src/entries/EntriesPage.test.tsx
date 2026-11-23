@@ -2042,3 +2042,78 @@ test('after adding an entry that ends at 24:00 the next empty row is empty with 
     expect(addForm().getByRole('textbox', { name: 'Start' })).toHaveFocus()
   })
 })
+
+// On the night the clocks go forward 02:00–02:59 doesn't exist: a start of
+// 02:30 becomes 03:30, past an end of 03:00. The real times decide whether End
+// is after Start (specs/clock-changes.feature).
+
+test('shows "End must be after start" and no duration in the add row when the start moves past the end as the clocks go forward', async () => {
+  const { user } = await renderOnDay('2026-03-29')
+  await screen.findByText('No entries')
+
+  await fillAddForm(user, { start: '02:30', end: '03:00' })
+
+  expect(addForm().getByText(endNotAfterStart)).toBeInTheDocument()
+  expect(
+    addForm().getByRole('textbox', { name: 'End' }),
+  ).not.toHaveAccessibleDescription(/Duration/)
+})
+
+test('rejects adding an entry whose start moves past its end as the clocks go forward', async () => {
+  const { user } = await renderOnDay('2026-03-29')
+  await screen.findByText('No entries')
+
+  await addEntry(user, { start: '02:30', end: '03:00', label: 'Client' })
+
+  expect(await addForm().findByRole('alert')).toHaveTextContent(
+    endNotAfterStart,
+  )
+  expect(screen.getAllByRole('alert')).toHaveLength(1)
+  expect(screen.getByText('No entries')).toBeInTheDocument()
+  expect(listedEntries()).toEqual([])
+})
+
+test('rejects adding with Enter an entry whose start moves past its end as the clocks go forward', async () => {
+  const { user } = await renderOnDay('2026-03-29')
+  await screen.findByText('No entries')
+
+  await fillAddForm(user, { start: '02:30', end: '03:00', label: 'Client' })
+  await user.type(addForm().getByRole('textbox', { name: 'End' }), '{Enter}')
+
+  expect(await addForm().findByRole('alert')).toHaveTextContent(
+    endNotAfterStart,
+  )
+  expect(screen.getAllByRole('alert')).toHaveLength(1)
+  expect(screen.getByText('No entries')).toBeInTheDocument()
+  expect(listedEntries()).toEqual([])
+})
+
+test('shows "End must be after start" and rejects the save in the editor when the start moves past the end as the clocks go forward', async () => {
+  const { user } = await renderOnDay('2026-03-29', [
+    { date: '2026-03-29', start: '01:00', end: '04:00', label: 'Client' },
+  ])
+  const [entry] = await findEntries(1)
+  const editor = await openEntry(user, entry.item)
+  const start = editor.getByRole('textbox', { name: 'Start' })
+  const end = editor.getByRole('textbox', { name: 'End' })
+
+  await user.clear(start)
+  await user.type(start, '02:30')
+  await user.clear(end)
+  await user.type(end, '03:00')
+
+  expect(editor.getByText(endNotAfterStart)).toBeInTheDocument()
+  expect(end).not.toHaveAccessibleDescription(/Duration/)
+
+  await user.type(end, '{Enter}')
+
+  expect(await editor.findByRole('alert')).toHaveTextContent(endNotAfterStart)
+  expect(screen.getAllByRole('alert')).toHaveLength(1)
+  expect(editorShown()).toBe(true)
+
+  await user.click(editor.getByRole('button', { name: 'Cancel' }))
+
+  expect(listedEntries()).toMatchObject([
+    { start: '01:00', end: '04:00', label: 'Client' },
+  ])
+})
