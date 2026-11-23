@@ -48,6 +48,14 @@ export function endsAfterStart(
   return endMinutesOf(end) > minutesOf(start)
 }
 
+/**
+ * Whether the end of a time range is after its start, both on the clock (see `endsAfterStart`) and in real time:
+ * on the night the clocks go forward a start in the gap moves on and can pass the end.
+ */
+export function timesInOrder(range: TimeRange): boolean {
+  return endsAfterStart(range.start, range.end) && durationOfRange(range) > 0
+}
+
 /** Today's date in a time zone at the given moment. */
 export function todayIn(
   now: Temporal.Instant,
@@ -56,17 +64,13 @@ export function todayIn(
   return now.toZonedDateTimeISO(timeZone).toPlainDate()
 }
 
-/**
- * The first rule an entry breaks, or undefined when it is valid.
- * Times are compared as wall-clock times, so clock changes do not matter.
- */
+/** The first rule an entry breaks, or undefined when it is valid. */
 function validate(
-  { date, start, end, labelId, timeZone }: NewEntry,
+  entry: NewEntry,
   now: Temporal.Instant,
 ): EntryError | undefined {
-  if (!endsAfterStart(start, end)) {
-    return 'end-not-after-start'
-  }
+  const { date, labelId, timeZone } = entry
+  if (!timesInOrder(entry)) return 'end-not-after-start'
   if (labelId === '') return 'no-label'
   if (Temporal.PlainDate.compare(date, todayIn(now, timeZone)) > 0) {
     return 'after-today'

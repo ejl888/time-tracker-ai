@@ -40,3 +40,7 @@ Feature: Entries on the nights the clocks change
   Scenario: A time that occurs twice gives a warning
     When I enter an entry on 2026-10-25 from 02:30 to 04:00
     Then I am warned that 02:30 occurs twice and the first one is used
+
+  Scenario: An entry whose start moves past its end is rejected
+    When I add an entry on 2026-03-29 from 02:30 to 03:00 labelled Project
+    Then the entry is rejected
