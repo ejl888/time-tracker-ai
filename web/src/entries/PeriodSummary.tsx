@@ -15,6 +15,7 @@ import {
   expectedNote,
   periodTitle,
 } from './summaryMessages.ts'
+import './summary.css'
 
 /** The contract and expected minutes loaded for a date. */
 interface Loaded {

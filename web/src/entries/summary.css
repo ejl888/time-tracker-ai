@@ -1,0 +1,88 @@
+/* Period summary, from the summary strip of the Log view in docs/prototype/index.html. */
+.summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+/* Not in the prototype: hides the empty frame while the summary loads. */
+.summary:empty {
+  display: none;
+}
+.summary > .hint {
+  padding: 14px 16px;
+}
+
+/* The prototype shows the period title in the period bar; here it heads the summary as a full-width row. */
+.summary .ptitle {
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+}
+/* The prototype's .period-title, at its compact header size. */
+.period-name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 18px;
+  text-wrap: balance;
+}
+.period-sub {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* One metric per cell; each draws its right and bottom border, the outer ones are clipped by the summary. */
+.metric {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  margin: 0 -1px -1px 0;
+  min-width: 0;
+}
+.metric .k {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.metric .n {
+  font-size: 12px;
+  color: var(--muted);
+}
+/* The prototype marks the input with .invalid and replaces the note; the app shows the error as the note. */
+.metric .n.err {
+  color: var(--bad);
+}
+.exp-input {
+  width: 100%;
+  max-width: 120px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 22px;
+  font-weight: 500;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 2px 8px;
+  background: var(--bg);
+}
+
+/* Phones: the period name and its dates on one line. */
+@media (max-width: 560px) {
+  .summary .ptitle {
+    flex-direction: row;
+    align-items: baseline;
+    flex-wrap: wrap;
+    column-gap: 6px;
+  }
+  .period-name {
+    font-size: 15px;
+  }
+}

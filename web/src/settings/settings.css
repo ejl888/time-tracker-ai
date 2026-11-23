@@ -1,0 +1,74 @@
+/* Settings screen, from the Settings view in docs/prototype/index.html. */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.panel h2 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 18px;
+  margin: 0;
+}
+.panel > .hint {
+  margin-top: -6px;
+}
+
+/* Not in the prototype, whose fields save on change: the form holds the fields, the Save button and the messages. */
+.contract-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.contract-form > .btn {
+  align-self: flex-start;
+}
+
+/* The prototype styles every .field this way; scoped to .fields so the entry editor keeps its own look. */
+.fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+}
+.fields .field label,
+.fields .field .lab {
+  font-size: 13px;
+  font-weight: 500;
+}
+.fields input[type='text'],
+.fields input[type='date'] {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: var(--bg);
+  width: 100%;
+}
+
+/* Week or month: a segmented control. */
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  width: fit-content;
+}
+.seg button {
+  border: 0;
+  background: var(--surface);
+  padding: 7px 16px;
+}
+.seg button[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* Not in the prototype: shows the fields are locked once billing periods depend on them. */
+.seg button:disabled,
+.fields input:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

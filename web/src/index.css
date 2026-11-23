@@ -152,7 +152,27 @@ header.app {
   cursor: default;
 }
 
+/* Form fields: a label above the control and a help line below. */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+/* The prototype styles only .field .help; the app also uses it for a note below a form. */
+.help {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
 /* Messages */
+/* The prototype styles only .panel p.hint; the summary uses it too. */
+.hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
 .msg {
   margin: 0;
   font-size: 13px;
