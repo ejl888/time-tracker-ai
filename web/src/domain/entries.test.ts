@@ -5,6 +5,8 @@ import {
   createEntryService,
   dateOf,
   durationOf,
+  durationOfRange,
+  endsAfterStart,
   overlapping,
   prefillFor,
 } from './entries.ts'
@@ -207,4 +209,45 @@ test('a candidate ending at midnight overlaps an entry ending at midnight', asyn
   const result = overlapping(candidate('22:30', '00:00'), await entries.all())
 
   expect(result.map((e) => e.id)).toEqual([entry.id])
+})
+
+test('an end after the start on the same day ends after the start', () => {
+  expect(endsAfterStart(time('09:00'), time('10:30'))).toBe(true)
+})
+
+test('an end before or equal to the start does not end after the start', () => {
+  expect(endsAfterStart(time('10:00'), time('09:00'))).toBe(false)
+  expect(endsAfterStart(time('10:00'), time('10:00'))).toBe(false)
+})
+
+test('an end of 00:00 counts as 24:00 for ending after the start', () => {
+  expect(endsAfterStart(time('22:00'), time('00:00'))).toBe(true)
+  expect(endsAfterStart(time('00:00'), time('00:00'))).toBe(true)
+  expect(endsAfterStart(time('22:00'), time('00:30'))).toBe(false)
+})
+
+test('the duration of a range is the minutes between its start and end', () => {
+  expect(durationOfRange(candidate('09:00', '10:30'))).toBe(90)
+})
+
+test('the duration of a range ending at 00:00 runs to midnight at the end of the day', () => {
+  expect(durationOfRange(candidate('22:00', '00:00'))).toBe(120)
+})
+
+test('the duration of a range is an hour shorter on the night the clocks go forward', () => {
+  const range = {
+    ...candidate('01:00', '04:00'),
+    date: Temporal.PlainDate.from('2026-03-29'),
+  }
+
+  expect(durationOfRange(range)).toBe(120)
+})
+
+test('the duration of a range is an hour longer on the night the clocks go back', () => {
+  const range = {
+    ...candidate('01:00', '04:00'),
+    date: Temporal.PlainDate.from('2026-10-25'),
+  }
+
+  expect(durationOfRange(range)).toBe(240)
 })
