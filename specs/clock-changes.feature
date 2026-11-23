@@ -32,3 +32,11 @@ Feature: Entries on the nights the clocks change
   Scenario: An end time that occurs twice is the earlier one
     Given an entry on 2026-10-25 from 01:00 to 02:30 labelled Project
     Then the duration of that entry is 1:30
+
+  Scenario: A time that does not exist gives a warning
+    When I enter an entry on 2026-03-29 from 02:30 to 04:00
+    Then I am warned that 02:30 does not exist and becomes 03:30
+
+  Scenario: A time that occurs twice gives a warning
+    When I enter an entry on 2026-10-25 from 02:30 to 04:00
+    Then I am warned that 02:30 occurs twice and the first one is used
