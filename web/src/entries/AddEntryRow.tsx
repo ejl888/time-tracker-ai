@@ -1,16 +1,10 @@
 import { useRef, useState } from 'react'
-import type { FormEvent } from 'react'
 import type { Temporal } from 'temporal-polyfill'
 import type { EntryService, Prefill } from '../domain/entries.ts'
 import type { Label } from '../domain/records.ts'
-import {
-  formatTime,
-  MIDNIGHT,
-  parseEndTime,
-  parseTime,
-} from '../domain/timeText.ts'
-import { cancelOnEscape } from './cancelOnEscape.ts'
-import { entryErrorMessage, INVALID_TIME_MESSAGE } from './entryMessages.ts'
+import { formatTime, MIDNIGHT } from '../domain/timeText.ts'
+import type { Draft, DraftFields } from './EntryForm.tsx'
+import { EntryForm } from './EntryForm.tsx'
 
 interface AddEntryRowProps {
   entries: EntryService
@@ -25,14 +19,8 @@ interface AddEntryRowProps {
   onAdded: () => void
 }
 
-/** The texts of the add row's fields. */
-interface Draft {
-  startText: string
-  /** Undefined while End is untouched, so it follows Start. */
-  endText: string | undefined
-  labelId: string
-  description: string
-}
+/** The texts typed in the add row; End is undefined while untouched, so it follows Start. */
+type TypedDraft = Omit<Draft, 'endText'> & { endText: string | undefined }
 
 /**
  * The end time a row is prefilled with. A prefilled end equals the start, so 00:00 can only mean a start of 00:00;
@@ -43,7 +31,7 @@ function prefilledEnd(end: Temporal.PlainTime): string {
 }
 
 /** The fields of a row nobody has typed in yet: the prefill, no label and no description. */
-function untouchedDraft(prefill: Prefill | undefined): Draft {
+function untouchedDraft(prefill: Prefill | undefined): TypedDraft {
   return {
     startText: prefill ? formatTime(prefill.start) : '',
     endText: undefined,
@@ -74,102 +62,39 @@ export function AddEntryRow({
   onAdded,
 }: AddEntryRowProps) {
   // Undefined while untouched, so a new prefill shows; set on the first change.
-  const [typed, setTyped] = useState<Draft>()
-  const [message, setMessage] = useState<string>()
+  const [typed, setTyped] = useState<TypedDraft>()
   const endRef = useRef<HTMLInputElement>(null)
-  const draft = typed ?? untouchedDraft(prefill)
-  const { startText, labelId, description } = draft
-  const endText = draft.endText ?? followingEnd(prefill, startText)
-
-  function change(changes: Partial<Draft>) {
-    setTyped({ ...draft, ...changes })
+  const current = typed ?? untouchedDraft(prefill)
+  const draft: Draft = {
+    ...current,
+    endText: current.endText ?? followingEnd(prefill, current.startText),
   }
+  const labelChoices = [
+    { value: '', name: 'Pick a label' },
+    ...labels.map((label) => ({ value: label.id, name: label.name })),
+  ]
 
-  function clear() {
+  function added() {
     setTyped(undefined)
-    setMessage(undefined)
-  }
-
-  async function add(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const start = parseTime(startText)
-    const end = parseEndTime(endText)
-    if (!start || !end) {
-      setMessage(INVALID_TIME_MESSAGE)
-      return
-    }
-    const result = await entries.add({
-      date,
-      start,
-      end,
-      labelId,
-      description,
-      timeZone,
-    })
-    if (!result.ok) {
-      setMessage(entryErrorMessage(result.error))
-      return
-    }
-    clear()
     endRef.current?.focus()
     onAdded()
   }
 
   return (
-    <form
-      className="add-entry edit-row edit-grid"
-      aria-label="Add entry"
-      noValidate
-      autoComplete="off"
-      onSubmit={add}
-      onKeyDown={cancelOnEscape(clear)}
-    >
-      <input
-        className="num"
-        aria-label="Start"
-        value={startText}
-        onChange={(e) => change({ startText: e.target.value })}
+    <div className="edit-row">
+      <EntryForm
+        name="Add entry"
+        submitText="Add"
+        draft={draft}
+        onChange={(changes) => setTyped({ ...current, ...changes })}
+        labelChoices={labelChoices}
+        save={(fields: DraftFields) =>
+          entries.add({ ...fields, date, timeZone })
+        }
+        onDone={added}
+        onCancel={() => setTyped(undefined)}
+        endRef={endRef}
       />
-      <input
-        className="num"
-        aria-label="End"
-        ref={endRef}
-        value={endText}
-        onChange={(e) => change({ endText: e.target.value })}
-      />
-      <select
-        aria-label="Label"
-        value={labelId}
-        onChange={(e) => change({ labelId: e.target.value })}
-      >
-        <option value="">Pick a label</option>
-        {labels.map((label) => (
-          <option key={label.id} value={label.id}>
-            {label.name}
-          </option>
-        ))}
-      </select>
-      <input
-        className="wide"
-        aria-label="Description"
-        value={description}
-        onChange={(e) => change({ description: e.target.value })}
-      />
-      {message && (
-        <p className="msg err" role="alert">
-          {message}
-        </p>
-      )}
-      <div className="actions">
-        <button className="btn primary small" type="submit">
-          Add
-        </button>
-        <button className="btn small" type="button" onClick={clear}>
-          Cancel
-        </button>
-        <span className="spacer" />
-        <span className="keys">Enter saves · Esc cancels</span>
-      </div>
-    </form>
+    </div>
   )
 }
