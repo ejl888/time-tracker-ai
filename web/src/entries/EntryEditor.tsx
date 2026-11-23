@@ -47,7 +47,7 @@ function draftOf(entry: Entry): Draft {
 
 /**
  * The inline editor of a listed entry. Save or Enter saves; Cancel or Esc closes without saving.
- * A rejected save keeps the editor open with the typed values and shows why.
+ * Delete takes two clicks. A rejected save keeps the editor open with the typed values and shows why.
  */
 export function EntryEditor({
   entry,
@@ -60,6 +60,7 @@ export function EntryEditor({
 }: EntryEditorProps) {
   const [draft, setDraft] = useState(() => draftOf(entry))
   const [message, setMessage] = useState<string>()
+  const [deleteArmed, setDeleteArmed] = useState(false)
   const descriptionRef = useRef<HTMLInputElement>(null)
   const id = useId()
   const { startText, endText, labelId, description } = draft
@@ -90,8 +91,10 @@ export function EntryEditor({
     void run(update({ start, end, labelId, description }))
   }
 
-  function confirmRemove() {
-    if (window.confirm('Delete this entry?')) void run(remove())
+  /** The first click arms Delete; the second click deletes. */
+  function clickDelete() {
+    if (deleteArmed) void run(remove())
+    else setDeleteArmed(true)
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLFormElement>) {
@@ -168,8 +171,8 @@ export function EntryEditor({
         <button className="btn" type="button" onClick={onCancel}>
           Cancel
         </button>
-        <button className="btn danger" type="button" onClick={confirmRemove}>
-          Delete
+        <button className="btn danger" type="button" onClick={clickDelete}>
+          {deleteArmed ? 'Click again to delete' : 'Delete'}
         </button>
         <span className="spacer" />
         <span className="keys">Enter saves · Esc cancels</span>

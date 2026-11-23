@@ -819,27 +819,29 @@ test('sorts the list again when a changed start moves an entry', async () => {
   expect(listedEntries()[0]).toMatchObject({ description: 'Filing' })
 })
 
-/** Opens this entry's editor and clicks Delete, answering the confirmation. */
+/** Opens this entry's editor and deletes it with two clicks on Delete. */
 async function deleteEntry(
   user: ReturnType<typeof userEvent.setup>,
   item: HTMLElement,
-  confirmed: boolean,
 ) {
-  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(confirmed)
   const editor = await openEntry(user, item)
   await user.click(editor.getByRole('button', { name: 'Delete' }))
-  return confirm
+  await user.click(
+    editor.getByRole('button', { name: 'Click again to delete' }),
+  )
 }
 
-test('deletes an entry after confirmation', async () => {
+test('deletes an entry with two clicks on Delete', async () => {
   const { user, entries } = await renderPage(workLabels, twoEntries)
   const [first] = await findEntries(2)
   expect(screen.getByText('Worked 1:00')).toBeInTheDocument()
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
 
-  const confirm = await deleteEntry(user, first.item, true)
+  await deleteEntry(user, first.item)
 
-  expect(confirm).toHaveBeenCalledWith('Delete this entry?')
+  expect(confirm).not.toHaveBeenCalled()
   await waitFor(() => expect(listedEntries()).toHaveLength(1))
+  expect(editorShown()).toBe(false)
   expect(listedEntries()[0]).toMatchObject({ description: 'Filing' })
   expect(screen.getByText('Worked 0:00')).toBeInTheDocument()
   expect(
@@ -847,14 +849,19 @@ test('deletes an entry after confirmation', async () => {
   ).toEqual(['Filing'])
 })
 
-test('keeps the entry when the deletion is cancelled', async () => {
+test('keeps the entry after one click on Delete and Esc', async () => {
   const { user, entries } = await renderPage(workLabels, twoEntries)
   const [first] = await findEntries(2)
   const before = await savedEntries(entries)
 
-  const confirm = await deleteEntry(user, first.item, false)
+  const editor = await openEntry(user, first.item)
+  await user.click(editor.getByRole('button', { name: 'Delete' }))
+  expect(
+    editor.getByRole('button', { name: 'Click again to delete' }),
+  ).toBeInTheDocument()
+  await user.keyboard('{Escape}')
 
-  expect(confirm).toHaveBeenCalledWith('Delete this entry?')
+  expect(editorShown()).toBe(false)
   expect(listedEntries()).toHaveLength(2)
   expect(screen.getByText('Worked 1:00')).toBeInTheDocument()
   expect(await savedEntries(entries)).toEqual(before)
