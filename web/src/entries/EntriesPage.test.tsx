@@ -3,13 +3,19 @@ import userEvent from '@testing-library/user-event'
 import { Temporal } from 'temporal-polyfill'
 import { afterEach, expect, test, vi } from 'vitest'
 import { fixedClock } from '../domain/clock.ts'
+import { createContractService } from '../domain/contracts.ts'
 import {
   createEntryService,
   endTimeOf,
   startTimeOf,
 } from '../domain/entries.ts'
 import { createLabelService } from '../domain/labels.ts'
-import type { Entry, Label } from '../domain/records.ts'
+import type {
+  Contract,
+  Entry,
+  ExpectedHours,
+  Label,
+} from '../domain/records.ts'
 import { InMemoryRepository } from '../domain/repository.ts'
 import { formatEndTime, formatTime } from '../domain/timeText.ts'
 import { EntriesPage } from './EntriesPage.tsx'
@@ -68,6 +74,11 @@ async function renderPage(
     <EntriesPage
       entries={entries}
       labels={labels}
+      contracts={createContractService(
+        new InMemoryRepository<Contract>(),
+        new InMemoryRepository<ExpectedHours>(),
+        clock,
+      )}
       clock={clock}
       timeZone={timeZone}
     />,
@@ -907,6 +918,11 @@ test('shows "(unknown label)" for an entry whose label is not stored', async () 
     <EntriesPage
       entries={entries}
       labels={labels}
+      contracts={createContractService(
+        new InMemoryRepository<Contract>(),
+        new InMemoryRepository<ExpectedHours>(),
+        clock,
+      )}
       clock={clock}
       timeZone={timeZone}
     />,
@@ -1263,6 +1279,11 @@ async function renderWithUnknownLabel(
     <EntriesPage
       entries={entries}
       labels={labels}
+      contracts={createContractService(
+        new InMemoryRepository<Contract>(),
+        new InMemoryRepository<ExpectedHours>(),
+        clock,
+      )}
       clock={clock}
       timeZone={timeZone}
     />,
@@ -1802,6 +1823,11 @@ async function renderOnDay(date: string, seedEntries: SeedEntry[] = []) {
     <EntriesPage
       entries={entries}
       labels={labels}
+      contracts={createContractService(
+        new InMemoryRepository<Contract>(),
+        new InMemoryRepository<ExpectedHours>(),
+        dayClock,
+      )}
       clock={dayClock}
       timeZone={timeZone}
     />,

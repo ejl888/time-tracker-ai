@@ -42,6 +42,7 @@ function App() {
         <EntriesPage
           entries={app.entries}
           labels={app.labels}
+          contracts={app.contracts}
           clock={systemClock}
           timeZone={app.timeZone}
         />
