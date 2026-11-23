@@ -15,10 +15,10 @@ test('shows the app name as heading', () => {
   ).toBeInTheDocument()
 })
 
-/** Switches to the labels screen with its tab button. */
-async function openLabels() {
+/** Switches to the settings screen, which holds the labels, with its tab button. */
+async function openSettings() {
   const user = userEvent.setup()
-  await user.click(screen.getByRole('button', { name: 'Labels' }))
+  await user.click(screen.getByRole('button', { name: 'Settings' }))
 }
 
 /** Adds a label through the add form of the labels screen. */
@@ -32,12 +32,12 @@ async function addLabel(name: string) {
 
 test('keeps an added label after a reload', async () => {
   const { unmount } = render(<App />)
-  await openLabels()
+  await openSettings()
   await addLabel('Travel')
   unmount()
 
   render(<App />)
-  await openLabels()
+  await openSettings()
 
   const list = await screen.findByRole('list')
   expect(await within(list).findByDisplayValue('Travel')).toBeInTheDocument()
@@ -45,7 +45,7 @@ test('keeps an added label after a reload', async () => {
 
 test('stores labels in localStorage under timetracker.labels', async () => {
   render(<App />)
-  await openLabels()
+  await openSettings()
   await addLabel('Travel')
 
   const stored = JSON.parse(localStorage.getItem('timetracker.labels') ?? '[]')
@@ -89,7 +89,7 @@ test('opens on the entries screen', async () => {
     'aria-pressed',
     'true',
   )
-  expect(screen.getByRole('button', { name: 'Labels' })).toHaveAttribute(
+  expect(screen.getByRole('button', { name: 'Settings' })).toHaveAttribute(
     'aria-pressed',
     'false',
   )
@@ -101,12 +101,12 @@ test('opens on the entries screen', async () => {
   ).not.toBeInTheDocument()
 })
 
-test('switches between the entries and labels screens', async () => {
+test('switches between the entries and settings screens', async () => {
   render(<App />)
 
-  await openLabels()
+  await openSettings()
 
-  expect(screen.getByRole('button', { name: 'Labels' })).toHaveAttribute(
+  expect(screen.getByRole('button', { name: 'Settings' })).toHaveAttribute(
     'aria-pressed',
     'true',
   )
@@ -127,7 +127,7 @@ test('switches between the entries and labels screens', async () => {
     'aria-pressed',
     'true',
   )
-  expect(screen.getByRole('button', { name: 'Labels' })).toHaveAttribute(
+  expect(screen.getByRole('button', { name: 'Settings' })).toHaveAttribute(
     'aria-pressed',
     'false',
   )
@@ -141,7 +141,7 @@ test('switches between the entries and labels screens', async () => {
 
 test('keeps an added entry after a reload and stores it under timetracker.entries', async () => {
   const { unmount } = render(<App />)
-  await openLabels()
+  await openSettings()
   await addLabel('Client')
   await openEntries()
   await addEntry('Client', 'Review')
@@ -161,14 +161,57 @@ test('keeps an added entry after a reload and stores it under timetracker.entrie
 
 test('shows a label used by an entry as in use on the labels screen', async () => {
   render(<App />)
-  await openLabels()
+  await openSettings()
   await addLabel('Client')
   await openEntries()
   await addEntry('Client', 'Review')
 
-  await openLabels()
+  await openSettings()
 
   expect(
     await screen.findByText('In use: create a new label to change this'),
   ).toBeInTheDocument()
+})
+
+test('shows the contract above the labels on the settings screen', async () => {
+  render(<App />)
+
+  await openSettings()
+
+  const contract = await screen.findByRole('heading', { name: 'Contract' })
+  const labels = await screen.findByRole('heading', { name: 'Labels' })
+  expect(
+    contract.compareDocumentPosition(labels) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy()
+})
+
+test('keeps a saved contract after a reload and stores it under timetracker.contracts', async () => {
+  const user = userEvent.setup()
+  const { unmount } = render(<App />)
+  await openSettings()
+  const limit = await screen.findByRole('textbox', {
+    name: 'Billable limit per week',
+  })
+  await user.clear(limit)
+  await user.type(limit, '40')
+  await user.click(screen.getByRole('button', { name: 'Save contract' }))
+  await screen.findByRole('status')
+  unmount()
+
+  render(<App />)
+  await openSettings()
+
+  expect(
+    await screen.findByRole('textbox', { name: 'Billable limit per week' }),
+  ).toHaveValue('40:00')
+  const stored = JSON.parse(
+    localStorage.getItem('timetracker.contracts') ?? '[]',
+  )
+  expect(stored).toEqual([
+    expect.objectContaining({
+      billingCycle: 'week',
+      billableLimit: 40 * 60,
+      deleted: false,
+    }),
+  ])
 })

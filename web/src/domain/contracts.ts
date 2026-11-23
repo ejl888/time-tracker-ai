@@ -90,6 +90,11 @@ export function createContractService(
     return active.find((record) => record.periodStart === periodStart)
   }
 
+  /** Whether cycle, start and limit are locked: expected hours exist for the contract. */
+  async function isLocked(contract: Contract): Promise<boolean> {
+    return (await activeExpected(contract)).length > 0
+  }
+
   /** Updates the contract; cycle, start and limit are locked once expected hours exist. */
   async function update(
     contract: Contract,
@@ -99,7 +104,7 @@ export function createContractService(
     if (!changes(contract, fields, keys)) return { ok: true, value: contract }
     if (
       changes(contract, fields, LOCKED_FIELDS) &&
-      (await activeExpected(contract)).length > 0
+      (await isLocked(contract))
     ) {
       return { ok: false, error: 'contract-locked' }
     }
@@ -155,6 +160,7 @@ export function createContractService(
 
   return {
     current,
+    isLocked,
 
     /** Creates the contract or updates the current one. */
     async save(
