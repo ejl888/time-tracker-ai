@@ -19,3 +19,22 @@ export function formatDateHeading(date: Temporal.PlainDate): string {
 export function formatShortDate(date: Temporal.PlainDate): string {
   return formatDayMonth(date, 'short')
 }
+
+/** A month and year in English, e.g. "November 2026". */
+export function formatMonthYear(date: Temporal.PlainDate): string {
+  return date.toLocaleString('en-GB', { month: 'long', year: 'numeric' })
+}
+
+/** The days of a period, e.g. "23–29 Nov 2026", or "28 Dec – 3 Jan 2027" across two months. */
+export function formatDateRange(
+  start: Temporal.PlainDate,
+  end: Temporal.PlainDate,
+): string {
+  const month = (date: Temporal.PlainDate) =>
+    date.toLocaleString('en-GB', { month: 'short' })
+  const last = `${end.day} ${month(end)} ${end.year}`
+  if (start.month === end.month && start.year === end.year) {
+    return `${start.day}–${last}`
+  }
+  return `${start.day} ${month(start)} – ${last}`
+}

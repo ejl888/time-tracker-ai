@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Temporal } from 'temporal-polyfill'
 import type { Clock } from '../domain/clock.ts'
+import type { ContractService } from '../domain/contracts.ts'
 import type { EntryService, Prefill } from '../domain/entries.ts'
 import { overlapping, overlappingIds, todayIn } from '../domain/entries.ts'
 import type { LabelService } from '../domain/labels.ts'
@@ -12,11 +13,13 @@ import { EntryEditor } from './EntryEditor.tsx'
 import type { TimesWarning } from './EntryForm.tsx'
 import { EntryRow } from './EntryRow.tsx'
 import { overlapMessage } from './entryMessages.ts'
+import { PeriodSummary } from './PeriodSummary.tsx'
 import './entries.css'
 
 interface EntriesPageProps {
   entries: EntryService
   labels: LabelService
+  contracts: ContractService
   clock: Clock
   timeZone: string
 }
@@ -79,6 +82,7 @@ async function loadDay(
 export function EntriesPage({
   entries,
   labels,
+  contracts,
   clock,
   timeZone,
 }: EntriesPageProps) {
@@ -158,6 +162,7 @@ export function EntriesPage({
           Today
         </button>
       </div>
+      <PeriodSummary contracts={contracts} date={date} />
       {shown && (
         <div className="day active">
           <DayEntries
