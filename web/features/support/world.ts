@@ -3,11 +3,18 @@ import type { IWorldOptions } from '@cucumber/cucumber'
 import { Temporal } from 'temporal-polyfill'
 import { fixedClock } from '../../src/domain/clock.ts'
 import type { Clock } from '../../src/domain/clock.ts'
+import { createContractService } from '../../src/domain/contracts.ts'
+import type { ContractFields } from '../../src/domain/contracts.ts'
 import { createEntryService } from '../../src/domain/entries.ts'
 import type { ClockChangeNote, Prefill } from '../../src/domain/entries.ts'
 import { createLabelService } from '../../src/domain/labels.ts'
 import type { LabelService } from '../../src/domain/labels.ts'
-import type { Entry, Label } from '../../src/domain/records.ts'
+import type {
+  Contract,
+  Entry,
+  ExpectedHours,
+  Label,
+} from '../../src/domain/records.ts'
 import { InMemoryRepository } from '../../src/domain/repository.ts'
 import type { Result } from '../../src/domain/result.ts'
 
@@ -18,6 +25,7 @@ export const ZONE = 'Europe/Amsterdam'
 const TIME_OF_DAY = Temporal.PlainTime.from('12:00')
 
 type EntryService = ReturnType<typeof createEntryService>
+type ContractService = ReturnType<typeof createContractService>
 
 /** Name of the hidden billable label for entries in a table without a label column. */
 export const TEST_LABEL = 'Test'
@@ -25,10 +33,15 @@ export const TEST_LABEL = 'Test'
 export class TimetrackerWorld extends World {
   labels = new InMemoryRepository<Label>()
   entries = new InMemoryRepository<Entry>()
+  contracts = new InMemoryRepository<Contract>()
+  expectedHours = new InMemoryRepository<ExpectedHours>()
   clock: Clock
   labelService: LabelService
   /** Shares the entries repository with the label service, so labels see their entries. */
   entryService: EntryService
+  contractService: ContractService
+  /** The contract fields given so far in the Background; the contract is saved once they are complete. */
+  contractFields: Partial<ContractFields> = {}
   /** The last entry added: "that entry". */
   lastEntry: Entry | undefined
   /** The result of the last action that can be rejected. */
@@ -44,6 +57,7 @@ export class TimetrackerWorld extends World {
     this.clock = fixedClock(Temporal.Instant.from('2026-01-01T12:00:00Z'))
     this.labelService = this.buildLabelService()
     this.entryService = this.buildEntryService()
+    this.contractService = this.buildContractService()
   }
 
   /** Sets a fixed clock at TIME_OF_DAY on the given date in ZONE. */
@@ -54,6 +68,7 @@ export class TimetrackerWorld extends World {
     this.clock = fixedClock(instant)
     this.labelService = this.buildLabelService()
     this.entryService = this.buildEntryService()
+    this.contractService = this.buildContractService()
   }
 
   /** The label with this name that is not deleted, if any. */
@@ -78,6 +93,10 @@ export class TimetrackerWorld extends World {
 
   private buildEntryService() {
     return createEntryService(this.entries, this.clock)
+  }
+
+  private buildContractService() {
+    return createContractService(this.contracts, this.expectedHours, this.clock)
   }
 }
 
