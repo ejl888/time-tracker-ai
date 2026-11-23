@@ -1,9 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import type { EntryChanges } from '../domain/entries.ts'
-import { endTimeOf, startTimeOf } from '../domain/entries.ts'
+import { dateOf, endTimeOf, startTimeOf } from '../domain/entries.ts'
 import type { Entry, Label } from '../domain/records.ts'
 import { formatEndTime, formatTime } from '../domain/timeText.ts'
-import type { Draft, EntryResult, LabelChoice } from './EntryForm.tsx'
+import type {
+  Draft,
+  EntryResult,
+  LabelChoice,
+  TimesWarning,
+} from './EntryForm.tsx'
 import { EntryForm } from './EntryForm.tsx'
 
 interface EntryEditorProps {
@@ -12,6 +17,8 @@ interface EntryEditorProps {
   labels: Label[]
   /** The entry's own label, which may be deleted; undefined when it is not stored. */
   label: Label | undefined
+  /** Warns about the typed times, e.g. which other entries they overlap. */
+  warn: TimesWarning
   update: (changes: EntryChanges) => Promise<EntryResult>
   remove: () => Promise<EntryResult>
   /** Called after the entry was saved or deleted. */
@@ -38,11 +45,14 @@ function labelChoicesOf(
   const choices = labels.map((option) => ({
     value: option.id,
     name: option.name,
+    billable: option.billable,
   }))
   if (!label)
     return [{ value: entry.labelId, name: '(unknown label)' }, ...choices]
-  if (label.deleted)
-    return [{ value: label.id, name: `${label.name} (deleted)` }, ...choices]
+  if (label.deleted) {
+    const name = `${label.name} (deleted)`
+    return [{ value: label.id, name, billable: label.billable }, ...choices]
+  }
   return choices
 }
 
@@ -54,6 +64,7 @@ export function EntryEditor({
   entry,
   labels,
   label,
+  warn,
   update,
   remove,
   onDone,
@@ -71,8 +82,12 @@ export function EntryEditor({
       name="Edit entry"
       submitText="Save"
       draft={draft}
+      date={dateOf(entry)}
+      timeZone={entry.timeZone}
       onChange={(changes) => setDraft({ ...draft, ...changes })}
       labelChoices={labelChoicesOf(entry, labels, label)}
+      endTouched
+      warn={warn}
       save={update}
       remove={remove}
       onDone={onDone}

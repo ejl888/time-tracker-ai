@@ -2,13 +2,15 @@ import { useEffect, useState } from 'react'
 import { Temporal } from 'temporal-polyfill'
 import type { Clock } from '../domain/clock.ts'
 import type { EntryService, Prefill } from '../domain/entries.ts'
-import { overlaps, todayIn } from '../domain/entries.ts'
+import { overlapping, overlaps, todayIn } from '../domain/entries.ts'
 import type { LabelService } from '../domain/labels.ts'
 import type { Entry, Label } from '../domain/records.ts'
 import { formatMinutes, workedMinutesOn } from '../domain/workedHours.ts'
 import { AddEntryRow } from './AddEntryRow.tsx'
 import { EntryEditor } from './EntryEditor.tsx'
+import type { TimesWarning } from './EntryForm.tsx'
 import { EntryRow } from './EntryRow.tsx'
+import { overlapMessage } from './entryMessages.ts'
 import './entries.css'
 
 interface EntriesPageProps {
@@ -35,6 +37,33 @@ function formatDateHeading(date: Temporal.PlainDate): string {
   const weekday = date.toLocaleString('en-GB', { weekday: 'long' })
   const month = date.toLocaleString('en-GB', { month: 'long' })
   return `${weekday} ${date.day} ${month} ${date.year}`
+}
+
+/** The name an entry is shown by in a warning: its description, else its label's name. */
+function nameOf(entry: Entry, labels: Label[]): string {
+  if (entry.description) return entry.description
+  const label = labels.find((option) => option.id === entry.labelId)
+  return label?.name ?? '(unknown label)'
+}
+
+/**
+ * Warns which entries of the day a draft's times overlap. The draft is entered in the time zone,
+ * and with an id it is that entry, which does not overlap itself.
+ */
+function overlapWarning(day: Day, timeZone: string, id?: string): TimesWarning {
+  return (start, end) => {
+    const overlapped = overlapping(
+      { date: day.date, start, end, timeZone, id },
+      day.entries,
+    )
+    if (overlapped.length === 0) return undefined
+    return overlapMessage(
+      overlapped.map((entry) => ({
+        entry,
+        name: nameOf(entry, day.usedLabels),
+      })),
+    )
+  }
 }
 
 /** Loads the entries of a date, the labels they use and the prefill for a new entry. */
@@ -140,6 +169,7 @@ export function EntriesPage({
               labels={shown.labels}
               timeZone={timeZone}
               prefill={shown.prefill}
+              warn={overlapWarning(shown, timeZone)}
               onAdded={() => void reload()}
             />
           )}
@@ -203,6 +233,7 @@ function DayEntries({
                   entry={entry}
                   labels={day.labels}
                   label={labelOf(entry)}
+                  warn={overlapWarning(day, entry.timeZone, entry.id)}
                   update={(changes) => entries.update(entry.id, changes)}
                   remove={() => entries.remove(entry.id)}
                   onDone={onEdited}
