@@ -5,6 +5,8 @@ import type { Label } from '../domain/records.ts'
 import { formatTime, MIDNIGHT } from '../domain/timeText.ts'
 import type { Draft, DraftFields, TimesWarning } from './EntryForm.tsx'
 import { EntryForm } from './EntryForm.tsx'
+import { formatShortDate } from './dateText.ts'
+import { choicesOf } from './labelChoices.ts'
 
 interface AddEntryRowProps {
   entries: EntryService
@@ -47,11 +49,8 @@ function sourceText(source: PrefillSource): string {
   switch (source.kind) {
     case 'previous':
       return 'From previous entry'
-    case 'same-as': {
-      const weekday = source.date.toLocaleString('en-GB', { weekday: 'short' })
-      const month = source.date.toLocaleString('en-GB', { month: 'short' })
-      return `Same as ${weekday} ${source.date.day} ${month}`
-    }
+    case 'same-as':
+      return `Same as ${formatShortDate(source.date)}`
     case 'default':
       return 'Default start'
   }
@@ -98,11 +97,7 @@ export function AddEntryRow({
   }
   const labelChoices = [
     { value: '', name: 'Pick a label' },
-    ...labels.map((label) => ({
-      value: label.id,
-      name: label.name,
-      billable: label.billable,
-    })),
+    ...choicesOf(labels),
   ]
 
   function added() {

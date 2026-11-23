@@ -7,6 +7,7 @@ import type { LabelService } from '../domain/labels.ts'
 import type { Entry, Label } from '../domain/records.ts'
 import { formatMinutes, workedMinutesOn } from '../domain/workedHours.ts'
 import { AddEntryRow } from './AddEntryRow.tsx'
+import { formatDateHeading } from './dateText.ts'
 import { EntryEditor } from './EntryEditor.tsx'
 import type { TimesWarning } from './EntryForm.tsx'
 import { EntryRow } from './EntryRow.tsx'
@@ -30,13 +31,6 @@ interface Day {
   usedLabels: Label[]
   /** The times a new entry on the date is prefilled with. */
   prefill: Prefill | undefined
-}
-
-/** A date in English, e.g. "Wednesday 18 November 2026", built from parts so no comma appears. */
-function formatDateHeading(date: Temporal.PlainDate): string {
-  const weekday = date.toLocaleString('en-GB', { weekday: 'long' })
-  const month = date.toLocaleString('en-GB', { month: 'long' })
-  return `${weekday} ${date.day} ${month} ${date.year}`
 }
 
 /** The name an entry is shown by in a warning: its description, else its label's name. */

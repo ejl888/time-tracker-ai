@@ -10,6 +10,7 @@ import type {
   TimesWarning,
 } from './EntryForm.tsx'
 import { EntryForm } from './EntryForm.tsx'
+import { choicesOf } from './labelChoices.ts'
 
 interface EntryEditorProps {
   entry: Entry
@@ -42,11 +43,7 @@ function labelChoicesOf(
   labels: Label[],
   label: Label | undefined,
 ): LabelChoice[] {
-  const choices = labels.map((option) => ({
-    value: option.id,
-    name: option.name,
-    billable: option.billable,
-  }))
+  const choices = choicesOf(labels)
   if (!label)
     return [{ value: entry.labelId, name: '(unknown label)' }, ...choices]
   if (label.deleted) {
