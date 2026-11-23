@@ -3,6 +3,7 @@ import { Given, Then, When } from '@cucumber/cucumber'
 import type { DataTable } from '@cucumber/cucumber'
 import { Temporal } from 'temporal-polyfill'
 import {
+  clockChangeNotes,
   durationOf,
   endTimeOf,
   overlaps,
@@ -305,5 +306,57 @@ Then(
   async function (this: TimetrackerWorld, date: Temporal.PlainDate) {
     const entries = await this.entryService.on(date)
     assert.equal(entries.length, 0, `entries on ${date}: ${entries.length}`)
+  },
+)
+
+When(
+  'I enter an entry on {date} from {time} to {time}',
+  function (
+    this: TimetrackerWorld,
+    date: Temporal.PlainDate,
+    start: Temporal.PlainTime,
+    end: Temporal.PlainTime,
+  ) {
+    this.clockChangeNotes = clockChangeNotes({
+      date,
+      start,
+      end,
+      timeZone: ZONE,
+    })
+  },
+)
+
+Then(
+  'I am warned that {time} does not exist and becomes {time}',
+  function (
+    this: TimetrackerWorld,
+    time: Temporal.PlainTime,
+    becomes: Temporal.PlainTime,
+  ) {
+    assert.ok(this.clockChangeNotes, 'no entry was entered')
+    const warned = this.clockChangeNotes.some(
+      (note) =>
+        note.kind === 'skipped' &&
+        note.time.equals(time) &&
+        note.becomes.equals(becomes),
+    )
+    assert.ok(
+      warned,
+      `no warning that ${hhmm(time)} becomes ${hhmm(becomes)}: ${JSON.stringify(this.clockChangeNotes)}`,
+    )
+  },
+)
+
+Then(
+  'I am warned that {time} occurs twice and the first one is used',
+  function (this: TimetrackerWorld, time: Temporal.PlainTime) {
+    assert.ok(this.clockChangeNotes, 'no entry was entered')
+    const warned = this.clockChangeNotes.some(
+      (note) => note.kind === 'repeated' && note.time.equals(time),
+    )
+    assert.ok(
+      warned,
+      `no warning that ${hhmm(time)} occurs twice: ${JSON.stringify(this.clockChangeNotes)}`,
+    )
   },
 )

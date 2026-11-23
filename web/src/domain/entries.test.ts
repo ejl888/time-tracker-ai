@@ -2,6 +2,7 @@ import { beforeEach, expect, test } from 'vitest'
 import { Temporal } from 'temporal-polyfill'
 import type { Clock } from './clock.ts'
 import {
+  clockChangeNotes,
   createEntryService,
   dateOf,
   durationOf,
@@ -294,4 +295,68 @@ test('a start that moves past the end as the clocks go forward is rejected', asy
 
   expect(result).toEqual({ ok: false, error: 'end-not-after-start' })
   expect(await entries.all()).toEqual([])
+})
+
+/** A range on a date with wall-clock times in Europe/Amsterdam. */
+function rangeOn(day: string, start: string, end: string) {
+  return { ...candidate(start, end), date: Temporal.PlainDate.from(day) }
+}
+
+test('a normal day gives no clock-change notes', () => {
+  expect(clockChangeNotes(rangeOn('2026-11-18', '09:00', '17:00'))).toEqual([])
+})
+
+test('a start that does not exist is skipped and becomes the time after the gap', () => {
+  const notes = clockChangeNotes(rangeOn('2026-03-29', '02:30', '04:00'))
+
+  expect(notes).toEqual([
+    { kind: 'skipped', time: time('02:30'), becomes: time('03:30') },
+  ])
+})
+
+test('an end that does not exist is skipped and becomes the time after the gap', () => {
+  const notes = clockChangeNotes(rangeOn('2026-03-29', '01:00', '02:30'))
+
+  expect(notes).toEqual([
+    { kind: 'skipped', time: time('02:30'), becomes: time('03:30') },
+  ])
+})
+
+test('a start that occurs twice is repeated', () => {
+  const notes = clockChangeNotes(rangeOn('2026-10-25', '02:30', '04:00'))
+
+  expect(notes).toEqual([{ kind: 'repeated', time: time('02:30') }])
+})
+
+test('a start and an end in the gap give two notes, the start first', () => {
+  const notes = clockChangeNotes(rangeOn('2026-03-29', '02:15', '02:45'))
+
+  expect(notes).toEqual([
+    { kind: 'skipped', time: time('02:15'), becomes: time('03:15') },
+    { kind: 'skipped', time: time('02:45'), becomes: time('03:45') },
+  ])
+})
+
+test('an end of 00:00 means midnight and gives no note', () => {
+  expect(clockChangeNotes(rangeOn('2026-03-29', '22:00', '00:00'))).toEqual([])
+  expect(clockChangeNotes(rangeOn('2026-10-25', '22:00', '00:00'))).toEqual([])
+})
+
+test('normal times on a clock-change day give no notes', () => {
+  expect(clockChangeNotes(rangeOn('2026-03-29', '01:00', '04:00'))).toEqual([])
+  expect(clockChangeNotes(rangeOn('2026-10-25', '01:00', '04:00'))).toEqual([])
+})
+
+test('a start equal to the end in the gap gives one note', () => {
+  const notes = clockChangeNotes(rangeOn('2026-03-29', '02:30', '02:30'))
+
+  expect(notes).toEqual([
+    { kind: 'skipped', time: time('02:30'), becomes: time('03:30') },
+  ])
+})
+
+test('a start equal to the end in the repeated hour gives one note', () => {
+  const notes = clockChangeNotes(rangeOn('2026-10-25', '02:30', '02:30'))
+
+  expect(notes).toEqual([{ kind: 'repeated', time: time('02:30') }])
 })

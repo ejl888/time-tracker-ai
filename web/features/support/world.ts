@@ -4,7 +4,7 @@ import { Temporal } from 'temporal-polyfill'
 import { fixedClock } from '../../src/domain/clock.ts'
 import type { Clock } from '../../src/domain/clock.ts'
 import { createEntryService } from '../../src/domain/entries.ts'
-import type { Prefill } from '../../src/domain/entries.ts'
+import type { ClockChangeNote, Prefill } from '../../src/domain/entries.ts'
 import { createLabelService } from '../../src/domain/labels.ts'
 import type { LabelService } from '../../src/domain/labels.ts'
 import type { Entry, Label } from '../../src/domain/records.ts'
@@ -35,6 +35,8 @@ export class TimetrackerWorld extends World {
   lastResult: Result<unknown, unknown> | undefined
   /** The prefill of the last new entry that was started. */
   prefill: Prefill | undefined
+  /** The clock-change notes for the times of the last entry entered, which is not saved. */
+  clockChangeNotes: ClockChangeNote[] | undefined
   private hasTestLabel = false
 
   constructor(options: IWorldOptions) {
