@@ -1865,3 +1865,122 @@ test('shows the real duration in the add row on the night the clocks go back', a
     addForm().getByRole('textbox', { name: 'End' }),
   ).toHaveAccessibleDescription('Duration 4:00')
 })
+
+/** The read-only row button of the listed entry with this description. */
+function rowOf(description: string) {
+  const found = listedEntries().find(
+    (entry) => entry.description === description,
+  )
+  if (!found) throw new Error(`no listed entry "${description}"`)
+  const button = rowButton(found.item)
+  if (!button) throw new Error(`the entry "${description}" has no row`)
+  return button
+}
+
+test('flags overlapping rows with "· overlaps", but not touching or separate ones', async () => {
+  await renderPage(workLabels, [
+    {
+      date: '2026-11-18',
+      start: '09:00',
+      end: '10:30',
+      label: 'Client',
+      description: 'First',
+    },
+    {
+      date: '2026-11-18',
+      start: '10:00',
+      end: '11:00',
+      label: 'Admin',
+      description: 'Second',
+    },
+    {
+      date: '2026-11-18',
+      start: '11:00',
+      end: '12:00',
+      label: 'Client',
+      description: 'Touching',
+    },
+    {
+      date: '2026-11-18',
+      start: '14:00',
+      end: '15:00',
+      label: 'Admin',
+      description: 'Separate',
+    },
+  ])
+  await findEntries(4)
+
+  expect(rowOf('First')).toHaveTextContent('· overlaps')
+  expect(rowOf('Second')).toHaveTextContent('· overlaps')
+  expect(rowOf('Touching')).not.toHaveTextContent('overlaps')
+  expect(rowOf('Separate')).not.toHaveTextContent('overlaps')
+})
+
+test('shows "—" in the row of an entry without description', async () => {
+  await renderPage(workLabels, [
+    { date: '2026-11-18', start: '09:00', end: '10:00', label: 'Client' },
+  ])
+
+  const [entry] = await findEntries(1)
+  const button = rowButton(entry.item)
+  expect(button).not.toBeNull()
+  expect(within(button as HTMLElement).getByText('—')).toBeInTheDocument()
+})
+
+test('going to another day closes an open editor and shows the empty row of that day', async () => {
+  const { user } = await renderPage(workLabels, [
+    {
+      date: '2026-11-18',
+      start: '09:00',
+      end: '10:00',
+      label: 'Client',
+      description: 'Today',
+    },
+    {
+      date: '2026-11-17',
+      start: '11:00',
+      end: '12:00',
+      label: 'Admin',
+      description: 'Yesterday',
+    },
+  ])
+  let [entry] = await findEntries(1)
+  await openEntry(user, entry.item)
+
+  await user.click(screen.getByRole('button', { name: 'Previous day' }))
+
+  expect(
+    await screen.findByRole('heading', { name: 'Tuesday 17 November 2026' }),
+  ).toBeInTheDocument()
+  entry = (await findEntries(1))[0]
+  expect(entry).toMatchObject({ description: 'Yesterday', open: false })
+  expect(editorShown()).toBe(false)
+  await expectAddTimes('12:00', '12:00')
+
+  await openEntry(user, entry.item)
+  await user.click(screen.getByRole('button', { name: 'Next day' }))
+
+  expect(
+    await screen.findByRole('heading', { name: 'Wednesday 18 November 2026' }),
+  ).toBeInTheDocument()
+  entry = (await findEntries(1))[0]
+  expect(entry).toMatchObject({ description: 'Today', open: false })
+  expect(editorShown()).toBe(false)
+  await expectAddTimes('10:00', '10:00')
+
+  await user.click(screen.getByRole('button', { name: 'Previous day' }))
+  expect(
+    await screen.findByRole('heading', { name: 'Tuesday 17 November 2026' }),
+  ).toBeInTheDocument()
+  entry = (await findEntries(1))[0]
+  await openEntry(user, entry.item)
+  await user.click(screen.getByRole('button', { name: 'Today' }))
+
+  expect(
+    await screen.findByRole('heading', { name: 'Wednesday 18 November 2026' }),
+  ).toBeInTheDocument()
+  entry = (await findEntries(1))[0]
+  expect(entry).toMatchObject({ description: 'Today', open: false })
+  expect(editorShown()).toBe(false)
+  await expectAddTimes('10:00', '10:00')
+})
