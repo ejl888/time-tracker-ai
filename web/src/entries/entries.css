@@ -69,9 +69,24 @@
   display: flex;
   flex-direction: column;
 }
-.entry-row {
+/* A read-only entry row; the prototype's full styling follows later. */
+.entry {
+  display: grid;
+  grid-template-columns: 110px 52px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
   padding: 7px 6px;
+  border: 0;
   border-top: 1px solid var(--line);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.entry .dur {
+  color: var(--muted);
 }
 .edit-row {
   border-top: 1px solid var(--line);
@@ -80,18 +95,17 @@
   border-radius: 6px;
 }
 
-/* Start, End, Label, Description, then the row's duration and Delete or the form's Add. */
+/* Start, End, Description and Label, each with its label above, as in the prototype's editor. */
 .edit-grid {
   display: grid;
-  grid-template-columns:
-    104px 104px minmax(100px, 150px)
-    minmax(0, 1fr) auto auto;
+  grid-template-columns: 104px 104px minmax(0, 1fr) 150px;
   gap: 8px;
-  /* The prototype aligns to the start because its fields have labels above; these have none. */
-  align-items: center;
+  align-items: start;
 }
+/* The add row: Start, End, Label, Description and Add, without labels above, so centred. */
 .add-entry.edit-grid {
   grid-template-columns: 104px 104px minmax(100px, 150px) minmax(0, 1fr) auto;
+  align-items: center;
 }
 .edit-grid input,
 .edit-grid select {
@@ -107,6 +121,29 @@
 }
 .edit-grid .msg {
   grid-column: 1 / -1;
+}
+
+/* The editor of a listed entry: labelled fields, then messages and actions. */
+.edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.actions .keys {
+  font-size: 12px;
+  color: var(--muted);
 }
 
 @media (max-width: 560px) {

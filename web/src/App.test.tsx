@@ -150,7 +150,9 @@ test('keeps an added entry after a reload and stores it under timetracker.entrie
   render(<App />)
 
   const list = await screen.findByRole('list', { name: 'Entries' })
-  expect(await within(list).findByDisplayValue('Review')).toBeInTheDocument()
+  expect(
+    await within(list).findByRole('button', { name: /Review/ }),
+  ).toBeInTheDocument()
   const stored = JSON.parse(localStorage.getItem('timetracker.entries') ?? '[]')
   expect(stored).toEqual([
     expect.objectContaining({ description: 'Review', deleted: false }),

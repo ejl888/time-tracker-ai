@@ -76,29 +76,67 @@ async function renderPage(
   return { user: userEvent.setup(), entries, labels, ids }
 }
 
-/** The entries in the list, in order, as shown in each row. */
+/**
+ * The read-only row of a listed entry: a button whose text starts with the
+ * time, like "09:00–10:30". None while that entry's editor is open.
+ */
+function rowButton(item: HTMLElement) {
+  return within(item).queryByRole('button', { name: /^\d\d:\d\d–/ })
+}
+
+/**
+ * The entries in the list, in order, as shown in each read-only row. The row
+ * button holds, in order, the time, the duration, the description ("—" when
+ * empty, maybe followed by "· overlaps") and the label chip. An entry whose
+ * editor is open has `open: true` and empty texts.
+ */
 function listedEntries() {
   const list = screen.queryByRole('list', { name: 'Entries' })
   if (!list) return []
   return within(list)
     .queryAllByRole('listitem')
     .map((item) => {
-      const row = within(item)
-      const select = row.getByRole('combobox', {
-        name: 'Label',
-      }) as HTMLSelectElement
+      const button = rowButton(item)
+      if (!button) {
+        return {
+          start: '',
+          end: '',
+          label: '',
+          description: '',
+          open: true,
+          item,
+        }
+      }
+      const [time = '', , description = '', label = ''] = Array.from(
+        button.children,
+      ).map((part) => part.textContent ?? '')
+      const [start = '', end = ''] = time.split('–')
+      const shown = description.replace(/\s*· overlaps$/, '').trim()
       return {
-        start: (row.getByRole('textbox', { name: 'Start' }) as HTMLInputElement)
-          .value,
-        end: (row.getByRole('textbox', { name: 'End' }) as HTMLInputElement)
-          .value,
-        label: select.selectedOptions[0]?.textContent ?? '',
-        description: (
-          row.getByRole('textbox', { name: 'Description' }) as HTMLInputElement
-        ).value,
+        start,
+        end,
+        label: label.trim(),
+        description: shown === '—' ? '' : shown,
+        open: false,
         item,
       }
     })
+}
+
+/** Clicks an entry's row and returns queries inside its editor. */
+async function openEntry(
+  user: ReturnType<typeof userEvent.setup>,
+  item: HTMLElement,
+) {
+  const button = rowButton(item)
+  if (!button) throw new Error('the entry has no read-only row to click')
+  await user.click(button)
+  return within(await within(item).findByRole('form', { name: 'Edit entry' }))
+}
+
+/** Whether an entry editor is shown anywhere on the page. */
+function editorShown() {
+  return screen.queryByRole('form', { name: 'Edit entry' }) !== null
 }
 
 /** Waits until the list shows this many entries and returns them. */
@@ -151,11 +189,6 @@ test("shows today's date and today's entries in time order", async () => {
     description: 'Meeting',
   })
   expect(within(second.item).getByText('1:30')).toBeInTheDocument()
-  for (const { item } of [first, second]) {
-    expect(
-      within(item).getByRole('button', { name: 'Delete' }),
-    ).toBeInTheDocument()
-  }
 })
 
 test('shows the worked hours of the day, counting only billable labels', async () => {
@@ -210,7 +243,8 @@ test('goes to the previous and next day, but not past today', async () => {
   expect(
     await screen.findByRole('heading', { name: 'Wednesday 18 November 2026' }),
   ).toBeInTheDocument()
-  expect(await screen.findByDisplayValue('Today')).toBeInTheDocument()
+  await findEntries(1)
+  expect(listedEntries()[0]).toMatchObject({ description: 'Today' })
   expect(screen.getByRole('button', { name: 'Next day' })).toBeDisabled()
 })
 
@@ -237,7 +271,8 @@ test('returns to today from an earlier day', async () => {
   expect(
     await screen.findByRole('heading', { name: 'Wednesday 18 November 2026' }),
   ).toBeInTheDocument()
-  expect(await screen.findByDisplayValue('Today')).toBeInTheDocument()
+  await findEntries(1)
+  expect(listedEntries()[0]).toMatchObject({ description: 'Today' })
   expect(screen.getByRole('button', { name: 'Next day' })).toBeDisabled()
 })
 
@@ -518,11 +553,6 @@ async function savedEntries(entries: ReturnType<typeof createEntryService>) {
   }))
 }
 
-/** A text field of a listed entry, found within that entry's row. */
-function rowField(item: HTMLElement, name: 'Start' | 'End' | 'Description') {
-  return within(item).getByRole('textbox', { name })
-}
-
 const twoEntries: SeedEntry[] = [
   {
     date: '2026-11-18',
@@ -540,115 +570,206 @@ const twoEntries: SeedEntry[] = [
   },
 ]
 
+test("clicking a row opens the editor with that entry's values and focus on Description", async () => {
+  const { user } = await renderPage(workLabels, twoEntries)
+  const [first, second] = await findEntries(2)
+
+  const editor = await openEntry(user, first.item)
+
+  expect(editor.getByRole('textbox', { name: 'Start' })).toHaveValue('09:00')
+  expect(editor.getByRole('textbox', { name: 'End' })).toHaveValue('10:00')
+  expect(editor.getByRole('combobox', { name: 'Label' })).toHaveDisplayValue(
+    'Client',
+  )
+  const description = editor.getByRole('textbox', { name: 'Description' })
+  expect(description).toHaveValue('Email')
+  expect(description).toHaveFocus()
+  for (const name of ['Save', 'Cancel', 'Delete']) {
+    expect(editor.getByRole('button', { name })).toBeInTheDocument()
+  }
+  expect(editor.getByText('Enter saves · Esc cancels')).toBeInTheDocument()
+  expect(rowButton(first.item)).not.toBeInTheDocument()
+  expect(
+    within(second.item).queryByRole('form', { name: 'Edit entry' }),
+  ).not.toBeInTheDocument()
+  expect(listedEntries()[1]).toMatchObject({
+    start: '15:00',
+    end: '16:00',
+    label: 'Admin',
+    description: 'Filing',
+    open: false,
+  })
+})
+
+test('clicking another row closes the first editor and discards its changes', async () => {
+  const { user, entries } = await renderPage(workLabels, twoEntries)
+  const [first, second] = await findEntries(2)
+  const before = await savedEntries(entries)
+  const firstEditor = await openEntry(user, first.item)
+  const end = firstEditor.getByRole('textbox', { name: 'End' })
+  await user.clear(end)
+  await user.type(end, '11:15')
+
+  const secondEditor = await openEntry(user, second.item)
+
+  expect(secondEditor.getByRole('textbox', { name: 'Start' })).toHaveValue(
+    '15:00',
+  )
+  expect(screen.getAllByRole('form', { name: 'Edit entry' })).toHaveLength(1)
+  expect(listedEntries()[0]).toMatchObject({
+    start: '09:00',
+    end: '10:00',
+    open: false,
+  })
+  expect(screen.getByText('Worked 1:00')).toBeInTheDocument()
+  expect(await savedEntries(entries)).toEqual(before)
+})
+
+test('Cancel closes the editor without saving', async () => {
+  const { user, entries } = await renderPage(workLabels, twoEntries)
+  const [first] = await findEntries(2)
+  const before = await savedEntries(entries)
+  const editor = await openEntry(user, first.item)
+  const description = editor.getByRole('textbox', { name: 'Description' })
+  await user.clear(description)
+  await user.type(description, 'Review')
+
+  await user.click(editor.getByRole('button', { name: 'Cancel' }))
+
+  expect(editorShown()).toBe(false)
+  expect(listedEntries()[0]).toMatchObject({ description: 'Email' })
+  expect(await savedEntries(entries)).toEqual(before)
+  expect(
+    await screen.findByRole('form', { name: 'Add entry' }),
+  ).toBeInTheDocument()
+})
+
 test("changes an entry's end with Enter and updates its duration and the worked hours", async () => {
   const { user, entries, ids } = await renderPage(workLabels, twoEntries)
   const [first] = await findEntries(2)
   expect(screen.getByText('Worked 1:00')).toBeInTheDocument()
-  const end = rowField(first.item, 'End')
+  const editor = await openEntry(user, first.item)
+  const end = editor.getByRole('textbox', { name: 'End' })
 
   await user.clear(end)
   await user.type(end, '11:15{Enter}')
 
   expect(await within(first.item).findByText('2:15')).toBeInTheDocument()
   expect(await screen.findByText('Worked 2:15')).toBeInTheDocument()
-  expect(rowField(listedEntries()[0].item, 'End')).toHaveValue('11:15')
+  expect(editorShown()).toBe(false)
+  expect(listedEntries()[0]).toMatchObject({ end: '11:15' })
   expect(await savedEntries(entries)).toEqual([
     { time: '09:00-11:15', labelId: ids.get('Client'), description: 'Email' },
     { time: '15:00-16:00', labelId: ids.get('Admin'), description: 'Filing' },
   ])
 })
 
-test("changes an entry's end when leaving the field", async () => {
+test("changes an entry's end with the Save button", async () => {
   const { user, entries } = await renderPage(workLabels, twoEntries)
   const [first] = await findEntries(2)
-  const end = rowField(first.item, 'End')
+  const before = await savedEntries(entries)
+  const editor = await openEntry(user, first.item)
+  const end = editor.getByRole('textbox', { name: 'End' })
 
   await user.clear(end)
   await user.type(end, '11:15')
+  // Leaving the field no longer saves.
   await user.tab()
+  expect(screen.getByText('Worked 1:00')).toBeInTheDocument()
+  expect(await savedEntries(entries)).toEqual(before)
+  await user.click(editor.getByRole('button', { name: 'Save' }))
 
   expect(await screen.findByText('Worked 2:15')).toBeInTheDocument()
   await waitFor(async () =>
     expect((await savedEntries(entries))[0].time).toBe('09:00-11:15'),
   )
+  expect(editorShown()).toBe(false)
 })
 
-test("changes an entry's description when leaving the field", async () => {
+test("changes an entry's description with the Save button", async () => {
   const { user, entries } = await renderPage(workLabels, twoEntries)
   const [first] = await findEntries(2)
-  const description = rowField(first.item, 'Description')
+  const editor = await openEntry(user, first.item)
+  const description = editor.getByRole('textbox', { name: 'Description' })
 
   await user.clear(description)
   await user.type(description, 'Review')
-  await user.tab()
+  await user.click(editor.getByRole('button', { name: 'Save' }))
 
   await waitFor(async () =>
     expect((await savedEntries(entries))[0].description).toBe('Review'),
   )
-  expect(listedEntries()[0]).toMatchObject({ description: 'Review' })
+  await waitFor(() =>
+    expect(listedEntries()[0]).toMatchObject({ description: 'Review' }),
+  )
   expect((await savedEntries(entries))[1].description).toBe('Filing')
 })
 
-test('reverts a changed field with Esc and saves nothing', async () => {
+test('Esc closes the editor and saves nothing', async () => {
   const { user, entries } = await renderPage(workLabels, twoEntries)
   const [first] = await findEntries(2)
   const before = await savedEntries(entries)
-  const end = rowField(first.item, 'End')
+  const editor = await openEntry(user, first.item)
+  const end = editor.getByRole('textbox', { name: 'End' })
 
   await user.clear(end)
   await user.type(end, '11:15')
   expect(end).toHaveValue('11:15')
   await user.keyboard('{Escape}')
 
-  expect(end).toHaveValue('10:00')
-  await user.tab()
-  expect(end).toHaveValue('10:00')
+  expect(editorShown()).toBe(false)
+  expect(listedEntries()[0]).toMatchObject({ end: '10:00' })
   expect(screen.getByText('Worked 1:00')).toBeInTheDocument()
   expect(await savedEntries(entries)).toEqual(before)
+  const reopened = await openEntry(user, first.item)
+  expect(reopened.getByRole('textbox', { name: 'End' })).toHaveValue('10:00')
 })
 
-test('rejects a changed time that is not HH:MM in the row and shows the saved time again', async () => {
+test('rejects a changed time that is not HH:MM in the editor and keeps the typed text', async () => {
   const { user, entries } = await renderPage(workLabels, twoEntries)
-  const [first, second] = await findEntries(2)
+  const [first] = await findEntries(2)
   const before = await savedEntries(entries)
-  const end = rowField(first.item, 'End')
+  const editor = await openEntry(user, first.item)
+  const end = editor.getByRole('textbox', { name: 'End' })
 
   await user.clear(end)
   await user.type(end, '9{Enter}')
 
-  expect(await within(first.item).findByRole('alert')).toHaveTextContent(
+  expect(await editor.findByRole('alert')).toHaveTextContent(
     'Enter a time as HH:MM',
   )
-  expect(end).toHaveValue('10:00')
-  expect(within(second.item).queryByRole('alert')).not.toBeInTheDocument()
-  expect(addForm().queryByRole('alert')).not.toBeInTheDocument()
+  expect(editor.getByRole('textbox', { name: 'End' })).toHaveValue('9')
+  // The message shows only in this editor.
+  expect(screen.getAllByRole('alert')).toHaveLength(1)
   expect(await savedEntries(entries)).toEqual(before)
 })
 
-test('rejects a changed end that is not after the start in the row', async () => {
+test('rejects a changed end that is not after the start in the editor', async () => {
   const { user, entries } = await renderPage(workLabels, twoEntries)
   const [first] = await findEntries(2)
   const before = await savedEntries(entries)
-  const end = rowField(first.item, 'End')
+  const editor = await openEntry(user, first.item)
+  const end = editor.getByRole('textbox', { name: 'End' })
 
   await user.clear(end)
   await user.type(end, '08:30{Enter}')
 
-  expect(await within(first.item).findByRole('alert')).toHaveTextContent(
+  expect(await editor.findByRole('alert')).toHaveTextContent(
     "End must be after start; an entry can't run past midnight, so split it",
   )
-  expect(end).toHaveValue('10:00')
-  expect(addForm().queryByRole('alert')).not.toBeInTheDocument()
+  expect(editor.getByRole('textbox', { name: 'End' })).toHaveValue('08:30')
+  expect(screen.getAllByRole('alert')).toHaveLength(1)
   expect(await savedEntries(entries)).toEqual(before)
 })
 
-test('clears the row message after a successful change in that row', async () => {
+test('a successful save closes the editor and its message', async () => {
   const { user } = await renderPage(workLabels, twoEntries)
   const [first] = await findEntries(2)
-  const end = rowField(first.item, 'End')
+  const editor = await openEntry(user, first.item)
+  const end = editor.getByRole('textbox', { name: 'End' })
   await user.clear(end)
   await user.type(end, '9{Enter}')
-  expect(await within(first.item).findByRole('alert')).toHaveTextContent(
+  expect(await editor.findByRole('alert')).toHaveTextContent(
     'Enter a time as HH:MM',
   )
 
@@ -656,22 +777,22 @@ test('clears the row message after a successful change in that row', async () =>
   await user.type(end, '11:15{Enter}')
 
   expect(await screen.findByText('Worked 2:15')).toBeInTheDocument()
-  await waitFor(() =>
-    expect(
-      within(listedEntries()[0].item).queryByRole('alert'),
-    ).not.toBeInTheDocument(),
-  )
+  expect(editorShown()).toBe(false)
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
 })
 
-test("changes an entry's label right away when another one is picked", async () => {
+test('changes the label on Save', async () => {
   const { user, entries, ids } = await renderPage(workLabels, twoEntries)
   const [first] = await findEntries(2)
   expect(screen.getByText('Worked 1:00')).toBeInTheDocument()
+  const editor = await openEntry(user, first.item)
 
   await user.selectOptions(
-    within(first.item).getByRole('combobox', { name: 'Label' }),
+    editor.getByRole('combobox', { name: 'Label' }),
     'Admin',
   )
+  expect(screen.getByText('Worked 1:00')).toBeInTheDocument()
+  await user.click(editor.getByRole('button', { name: 'Save' }))
 
   expect(await screen.findByText('Worked 0:00')).toBeInTheDocument()
   await waitFor(async () =>
@@ -683,7 +804,8 @@ test("changes an entry's label right away when another one is picked", async () 
 test('sorts the list again when a changed start moves an entry', async () => {
   const { user } = await renderPage(workLabels, twoEntries)
   const [, second] = await findEntries(2)
-  const start = rowField(second.item, 'Start')
+  const editor = await openEntry(user, second.item)
+  const start = editor.getByRole('textbox', { name: 'Start' })
 
   await user.clear(start)
   await user.type(start, '08:00{Enter}')
@@ -697,14 +819,15 @@ test('sorts the list again when a changed start moves an entry', async () => {
   expect(listedEntries()[0]).toMatchObject({ description: 'Filing' })
 })
 
-/** Clicks Delete in this row, answering the confirmation. */
+/** Opens this entry's editor and clicks Delete, answering the confirmation. */
 async function deleteEntry(
   user: ReturnType<typeof userEvent.setup>,
   item: HTMLElement,
   confirmed: boolean,
 ) {
   const confirm = vi.spyOn(window, 'confirm').mockReturnValue(confirmed)
-  await user.click(within(item).getByRole('button', { name: 'Delete' }))
+  const editor = await openEntry(user, item)
+  await user.click(editor.getByRole('button', { name: 'Delete' }))
   return confirm
 }
 
@@ -830,20 +953,29 @@ test('prefills the add row again after an add and resets its label', async () =>
   )
 })
 
-test('keeps typed text in the add row when another entry changes', async () => {
+test('opening an entry hides the empty row; closing it shows the prefill again', async () => {
   const { user } = await renderPage(workLabels, [
     { date: '2026-11-18', start: '09:00', end: '10:30', label: 'Client' },
   ])
   const [first] = await findEntries(1)
   await expectAddTimes('10:30', '10:30')
-
   await fillAddForm(user, { start: '08:00' })
-  const end = rowField(first.item, 'End')
+
+  let editor = await openEntry(user, first.item)
+
+  expect(
+    screen.queryByRole('form', { name: 'Add entry' }),
+  ).not.toBeInTheDocument()
+  await user.click(editor.getByRole('button', { name: 'Cancel' }))
+  await expectAddTimes('10:30', '10:30')
+
+  editor = await openEntry(user, first.item)
+  const end = editor.getByRole('textbox', { name: 'End' })
   await user.clear(end)
   await user.type(end, '12:00{Enter}')
 
   expect(await screen.findByText('Worked 3:00')).toBeInTheDocument()
-  expect(addForm().getByRole('textbox', { name: 'Start' })).toHaveValue('08:00')
+  await expectAddTimes('12:00', '12:00')
 })
 
 test('leaves the add row empty on a day whose latest entry ends at 24:00', async () => {

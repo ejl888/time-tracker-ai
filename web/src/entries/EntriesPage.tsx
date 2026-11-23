@@ -7,6 +7,7 @@ import type { LabelService } from '../domain/labels.ts'
 import type { Entry, Label } from '../domain/records.ts'
 import { formatMinutes, workedMinutesOn } from '../domain/workedHours.ts'
 import { AddEntryRow } from './AddEntryRow.tsx'
+import { EntryEditor } from './EntryEditor.tsx'
 import { EntryRow } from './EntryRow.tsx'
 import './entries.css'
 
@@ -61,6 +62,8 @@ export function EntriesPage({
   const today = todayIn(clock.now(), timeZone)
   const [date, setDate] = useState(today)
   const [day, setDay] = useState<Day>()
+  // The id of the entry whose editor is open; at most one is open at a time.
+  const [editing, setEditing] = useState<string>()
 
   useEffect(() => {
     let current = true
@@ -77,6 +80,18 @@ export function EntriesPage({
     setDay(await loadDay(date, entries, labels))
   }
 
+  /** Shows another date, closing any open editor. */
+  function goTo(other: Temporal.PlainDate) {
+    setEditing(undefined)
+    setDate(other)
+  }
+
+  /** Closes the editor after its entry was saved or deleted and shows the saved day. */
+  async function closeEditor() {
+    await reload()
+    setEditing(undefined)
+  }
+
   const isToday = date.equals(today)
   const shown = day?.date.equals(date) ? day : undefined
 
@@ -89,7 +104,7 @@ export function EntriesPage({
             className="icon-btn"
             type="button"
             aria-label="Previous day"
-            onClick={() => setDate(date.subtract({ days: 1 }))}
+            onClick={() => goTo(date.subtract({ days: 1 }))}
           >
             ‹
           </button>
@@ -99,13 +114,13 @@ export function EntriesPage({
             type="button"
             aria-label="Next day"
             disabled={isToday}
-            onClick={() => setDate(date.add({ days: 1 }))}
+            onClick={() => goTo(date.add({ days: 1 }))}
           >
             ›
           </button>
         </div>
         <span className="spacer" />
-        <button className="btn" type="button" onClick={() => setDate(today)}>
+        <button className="btn" type="button" onClick={() => goTo(today)}>
           Today
         </button>
       </div>
@@ -114,16 +129,20 @@ export function EntriesPage({
           <DayEntries
             day={shown}
             entries={entries}
-            onChanged={() => void reload()}
+            editing={editing}
+            onEdit={setEditing}
+            onEdited={() => void closeEditor()}
           />
-          <AddEntryRow
-            entries={entries}
-            date={shown.date}
-            labels={shown.labels}
-            timeZone={timeZone}
-            prefill={shown.prefill}
-            onAdded={() => void reload()}
-          />
+          {editing === undefined && (
+            <AddEntryRow
+              entries={entries}
+              date={shown.date}
+              labels={shown.labels}
+              timeZone={timeZone}
+              prefill={shown.prefill}
+              onAdded={() => void reload()}
+            />
+          )}
         </div>
       )}
     </section>
@@ -133,12 +152,29 @@ export function EntriesPage({
 interface DayEntriesProps {
   day: Day
   entries: EntryService
-  /** Called after an entry was changed or deleted. */
-  onChanged: () => void
+  /** The id of the entry whose editor is open, if any. */
+  editing: string | undefined
+  /** Opens the editor of an entry, or closes it with undefined, discarding its changes. */
+  onEdit: (id: string | undefined) => void
+  /** Called after the open entry was saved or deleted. */
+  onEdited: () => void
 }
 
-/** The worked hours, overlap warning and list of a loaded day. */
-function DayEntries({ day, entries, onChanged }: DayEntriesProps) {
+/** Whether an entry overlaps another of the entries. */
+function overlapsAnother(entry: Entry, entries: Entry[]): boolean {
+  return entries.some(
+    (other) => other.id !== entry.id && overlaps([entry, other]),
+  )
+}
+
+/** The worked hours, overlap warning and list of a loaded day, with the open entry as an editor. */
+function DayEntries({
+  day,
+  entries,
+  editing,
+  onEdit,
+  onEdited,
+}: DayEntriesProps) {
   const worked = workedMinutesOn(day.date, day.entries, day.usedLabels)
   const labelOf = (entry: Entry) =>
     day.usedLabels.find((label) => label.id === entry.labelId)
@@ -158,16 +194,29 @@ function DayEntries({ day, entries, onChanged }: DayEntriesProps) {
       ) : (
         <ul className="entries" aria-label="Entries">
           {day.entries.map((entry) => (
-            <EntryRow
-              // A saved change gives the row a new key, so its fields show the saved values.
-              key={`${entry.id}@${entry.updatedAt}`}
-              entry={entry}
-              labels={day.labels}
-              label={labelOf(entry)}
-              update={(changes) => entries.update(entry.id, changes)}
-              remove={() => entries.remove(entry.id)}
-              onChanged={onChanged}
-            />
+            <li
+              key={entry.id}
+              className={editing === entry.id ? 'edit-row' : undefined}
+            >
+              {editing === entry.id ? (
+                <EntryEditor
+                  entry={entry}
+                  labels={day.labels}
+                  label={labelOf(entry)}
+                  update={(changes) => entries.update(entry.id, changes)}
+                  remove={() => entries.remove(entry.id)}
+                  onDone={onEdited}
+                  onCancel={() => onEdit(undefined)}
+                />
+              ) : (
+                <EntryRow
+                  entry={entry}
+                  label={labelOf(entry)}
+                  overlaps={overlapsAnother(entry, day.entries)}
+                  onOpen={() => onEdit(entry.id)}
+                />
+              )}
+            </li>
           ))}
         </ul>
       )}
