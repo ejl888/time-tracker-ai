@@ -33,7 +33,12 @@ export function EntryRow({ entry, label, overlaps, onOpen }: EntryRowProps) {
       <span className="dur num">{formatMinutes(durationOf(entry))}</span>
       <span className="desc">
         {entry.description || '—'}
-        {overlaps && <span className="overlap-flag"> · overlaps</span>}
+        {overlaps && (
+          <>
+            {' '}
+            <span className="overlap-flag">· overlaps</span>
+          </>
+        )}
       </span>
       <span className="lbl">
         <span className={billable ? 'chip' : 'chip nb'}>{chipText(label)}</span>

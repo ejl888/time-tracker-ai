@@ -69,7 +69,7 @@
   display: flex;
   flex-direction: column;
 }
-/* A read-only entry row; the prototype's full styling follows later. */
+/* A read-only entry row: a button that opens its editor. Focus shows the shared :focus-visible outline. */
 .entry {
   display: grid;
   grid-template-columns: 110px 52px minmax(0, 1fr) auto;
@@ -79,29 +79,88 @@
   padding: 7px 6px;
   border: 0;
   border-top: 1px solid var(--line);
+  border-radius: 4px;
   background: none;
   color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
 }
+.entry:hover {
+  background: var(--bg);
+}
+.entry .desc {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .entry .dur {
   color: var(--muted);
 }
+.entry.nonbill .desc {
+  color: var(--muted);
+}
+.chip {
+  font-size: 12px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.chip::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.chip.nb::before {
+  background: none;
+  border: 1.5px solid var(--nonbill);
+  width: 4px;
+  height: 4px;
+}
+.overlap-flag {
+  color: var(--warn-fg);
+  font-size: 12px;
+}
+
+/* The inline editor: of an open entry, and the empty row below the list. */
 .edit-row {
   border-top: 1px solid var(--line);
   padding: 10px 8px;
   background: var(--accent-soft);
   border-radius: 6px;
 }
+.edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 
-/* Start, End, Description and Label, each with its label above, as in the prototype's editor. */
+/* Start, End, Description and Label, each with its label above and a help line below. */
 .edit-grid {
   display: grid;
   grid-template-columns: 104px 104px minmax(0, 1fr) 150px;
   gap: 8px;
   align-items: start;
 }
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.edit-grid .field label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  font-weight: 500;
+}
+/* The prototype's Label is a text field with autocomplete; here it is a dropdown, styled the same. */
 .edit-grid input,
 .edit-grid select {
   border: 1px solid var(--line);
@@ -111,22 +170,15 @@
   width: 100%;
   min-width: 0;
 }
-.edit-grid .duration {
+.field .help {
+  font-size: 12px;
   color: var(--muted);
 }
+.edit-grid .field .help {
+  min-height: 18px;
+}
 
-/* The editor of an entry and the add row: labelled fields, then messages and actions. */
-.edit-form {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
+/* Save, Cancel and Delete (sized by .btn.small), then the keyboard hint at the far end. */
 .actions {
   display: flex;
   gap: 8px;
@@ -138,11 +190,35 @@
   color: var(--muted);
 }
 
+/* Phones: the entry row in two lines without the duration, the editor in two columns. */
 @media (max-width: 560px) {
+  .entry {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      'time chip'
+      'desc desc';
+    row-gap: 2px;
+  }
+  .entry .time {
+    grid-area: time;
+  }
+  .entry .dur {
+    display: none;
+  }
+  .entry .desc {
+    grid-area: desc;
+  }
+  .entry .lbl {
+    grid-area: chip;
+    justify-self: end;
+  }
   .edit-grid {
     grid-template-columns: 1fr 1fr;
   }
   .edit-grid .wide {
     grid-column: 1 / -1;
+  }
+  .actions .keys {
+    display: none;
   }
 }
