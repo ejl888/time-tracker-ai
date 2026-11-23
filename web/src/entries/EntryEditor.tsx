@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import type { FormEvent, KeyboardEvent } from 'react'
+import type { FormEvent } from 'react'
 import type { EntryChanges, EntryError } from '../domain/entries.ts'
 import { endTimeOf, startTimeOf } from '../domain/entries.ts'
 import type { Entry, Label } from '../domain/records.ts'
@@ -10,6 +10,7 @@ import {
   parseEndTime,
   parseTime,
 } from '../domain/timeText.ts'
+import { cancelOnEscape } from './cancelOnEscape.ts'
 import { INVALID_TIME_MESSAGE, entryErrorMessage } from './entryMessages.ts'
 
 type EntryResult = Result<Entry, EntryError>
@@ -97,12 +98,6 @@ export function EntryEditor({
     else setDeleteArmed(true)
   }
 
-  function onKeyDown(event: KeyboardEvent<HTMLFormElement>) {
-    if (event.key !== 'Escape') return
-    event.preventDefault()
-    onCancel()
-  }
-
   return (
     <form
       className="edit-form"
@@ -110,7 +105,7 @@ export function EntryEditor({
       noValidate
       autoComplete="off"
       onSubmit={save}
-      onKeyDown={onKeyDown}
+      onKeyDown={cancelOnEscape(onCancel)}
     >
       <div className="edit-grid">
         <div className="field">
