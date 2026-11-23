@@ -1027,3 +1027,182 @@ test('leaves the end empty when the prefilled start is 00:00', async () => {
   expect(screen.getByText('No entries')).toBeInTheDocument()
   expect(listedEntries()).toEqual([])
 })
+
+test('after an add the next empty row shows the next prefill with focus on End', async () => {
+  const { user } = await renderPage(workLabels, [
+    { date: '2026-11-18', start: '09:00', end: '10:30', label: 'Client' },
+  ])
+  await findEntries(1)
+  await expectAddTimes('10:30', '10:30')
+
+  await fillAddForm(user, {
+    end: '11:15',
+    label: 'Client',
+    description: 'Review',
+  })
+  await user.type(
+    addForm().getByRole('textbox', { name: 'Description' }),
+    '{Enter}',
+  )
+
+  await findEntries(2)
+  await expectAddTimes('11:15', '11:15')
+  expect(addForm().getByRole('textbox', { name: 'Description' })).toHaveValue(
+    '',
+  )
+  await waitFor(() => {
+    expect(addForm().getByRole('textbox', { name: 'End' })).toHaveFocus()
+  })
+})
+
+test('puts focus on End after an add with the Add button', async () => {
+  const { user } = await renderPage(workLabels)
+  await screen.findByText('No entries')
+
+  await addEntry(user, { start: '09:00', end: '10:00', label: 'Client' })
+
+  await findEntries(1)
+  await expectAddTimes('10:00', '10:00')
+  await waitFor(() => {
+    expect(addForm().getByRole('textbox', { name: 'End' })).toHaveFocus()
+  })
+})
+
+test('moves an untouched End along when Start changes, keeping the prefilled duration', async () => {
+  const { user } = await renderPage(workLabels, [
+    { date: '2026-11-18', start: '09:00', end: '10:30', label: 'Client' },
+  ])
+  await findEntries(1)
+  await expectAddTimes('10:30', '10:30')
+
+  await fillAddForm(user, { start: '11:00' })
+  await expectAddTimes('11:00', '11:00')
+
+  await fillAddForm(user, { start: '08:45' })
+  await expectAddTimes('08:45', '08:45')
+})
+
+test('stops moving End along with Start once End was changed', async () => {
+  const { user } = await renderPage(workLabels, [
+    { date: '2026-11-18', start: '09:00', end: '10:30', label: 'Client' },
+  ])
+  await findEntries(1)
+  await expectAddTimes('10:30', '10:30')
+
+  await fillAddForm(user, { end: '12:00' })
+  await fillAddForm(user, { start: '11:00' })
+
+  await expectAddTimes('11:00', '12:00')
+})
+
+test('keeps an empty prefilled End empty when Start changes', async () => {
+  const { user } = await renderPage(workLabels, [
+    { date: '2026-11-17', start: '00:00', end: '08:00', label: 'Client' },
+  ])
+  await screen.findByText('No entries')
+  // Today has no entries, so it takes the earliest start of the day before.
+  await expectAddTimes('00:00', '')
+
+  await fillAddForm(user, { start: '08:00' })
+
+  await expectAddTimes('08:00', '')
+})
+
+/** Types in every field of the add row, so a reset is visible in each. */
+async function typeInEveryAddField(user: ReturnType<typeof userEvent.setup>) {
+  await fillAddForm(user, {
+    start: '11:00',
+    end: '12:00',
+    label: 'Client',
+    description: 'Draft',
+  })
+  await expectAddTimes('11:00', '12:00')
+}
+
+/** Checks that the add row shows its prefill again: these times, no label, no description, no message. */
+async function expectAddRowReset(start: string, end: string) {
+  await expectAddTimes(start, end)
+  expect(addForm().getByRole('combobox', { name: 'Label' })).toHaveDisplayValue(
+    'Pick a label',
+  )
+  expect(addForm().getByRole('textbox', { name: 'Description' })).toHaveValue(
+    '',
+  )
+  expect(addForm().queryByRole('alert')).not.toBeInTheDocument()
+}
+
+test('Cancel resets the add row to its prefill and adds nothing', async () => {
+  const { user } = await renderPage(workLabels, [
+    { date: '2026-11-18', start: '09:00', end: '10:30', label: 'Client' },
+  ])
+  await findEntries(1)
+  await expectAddTimes('10:30', '10:30')
+  await typeInEveryAddField(user)
+
+  await user.click(addForm().getByRole('button', { name: 'Cancel' }))
+
+  await expectAddRowReset('10:30', '10:30')
+  expect(listedEntries()).toHaveLength(1)
+  expect(screen.getByText('Worked 1:30')).toBeInTheDocument()
+})
+
+test('Esc resets the add row to its prefill and adds nothing', async () => {
+  const { user } = await renderPage(workLabels, [
+    { date: '2026-11-18', start: '09:00', end: '10:30', label: 'Client' },
+  ])
+  await findEntries(1)
+  await expectAddTimes('10:30', '10:30')
+  await typeInEveryAddField(user)
+
+  await user.keyboard('{Escape}')
+
+  await expectAddRowReset('10:30', '10:30')
+  expect(listedEntries()).toHaveLength(1)
+  expect(screen.getByText('Worked 1:30')).toBeInTheDocument()
+})
+
+test('Cancel clears a message in the add row', async () => {
+  const { user } = await renderPage(workLabels)
+  await screen.findByText('No entries')
+  await addEntry(user, { start: '09:00', end: '10:00' })
+  expect(await addForm().findByRole('alert')).toHaveTextContent('Pick a label')
+
+  await user.click(addForm().getByRole('button', { name: 'Cancel' }))
+
+  await expectAddRowReset('09:00', '09:00')
+})
+
+test('after a reset, End moves along with Start again', async () => {
+  const { user } = await renderPage(workLabels, [
+    { date: '2026-11-18', start: '09:00', end: '10:30', label: 'Client' },
+  ])
+  await findEntries(1)
+  await expectAddTimes('10:30', '10:30')
+  await fillAddForm(user, { end: '12:00' })
+  await user.keyboard('{Escape}')
+  await expectAddTimes('10:30', '10:30')
+
+  await fillAddForm(user, { start: '11:00' })
+
+  await expectAddTimes('11:00', '11:00')
+})
+
+test('shows the keys hint in the add row', async () => {
+  await renderPage(workLabels)
+  await screen.findByText('No entries')
+
+  expect(addForm().getByText('Enter saves · Esc cancels')).toBeInTheDocument()
+})
+
+test('stops moving End along with Start once End was cleared by hand', async () => {
+  const { user } = await renderPage(workLabels, [
+    { date: '2026-11-18', start: '09:00', end: '10:30', label: 'Client' },
+  ])
+  await findEntries(1)
+  await expectAddTimes('10:30', '10:30')
+
+  await user.clear(addForm().getByRole('textbox', { name: 'End' }))
+  await fillAddForm(user, { start: '11:00' })
+
+  await expectAddTimes('11:00', '')
+})

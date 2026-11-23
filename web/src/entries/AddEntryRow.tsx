@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { Temporal } from 'temporal-polyfill'
 import type { EntryService, Prefill } from '../domain/entries.ts'
@@ -9,6 +9,7 @@ import {
   parseEndTime,
   parseTime,
 } from '../domain/timeText.ts'
+import { cancelOnEscape } from './cancelOnEscape.ts'
 import { entryErrorMessage, INVALID_TIME_MESSAGE } from './entryMessages.ts'
 
 interface AddEntryRowProps {
@@ -27,7 +28,8 @@ interface AddEntryRowProps {
 /** The texts of the add row's fields. */
 interface Draft {
   startText: string
-  endText: string
+  /** Undefined while End is untouched, so it follows Start. */
+  endText: string | undefined
   labelId: string
   description: string
 }
@@ -44,15 +46,24 @@ function prefilledEnd(end: Temporal.PlainTime): string {
 function untouchedDraft(prefill: Prefill | undefined): Draft {
   return {
     startText: prefill ? formatTime(prefill.start) : '',
-    endText: prefill ? prefilledEnd(prefill.end) : '',
+    endText: undefined,
     labelId: '',
     description: '',
   }
 }
 
 /**
- * A form to add an entry to the shown date. Until you type in it, it shows the prefill;
- * after a successful add it shows the next prefill again.
+ * The end an untouched End shows: the start as typed, like the prefill, whose end equals its start.
+ * A prefilled end that is left empty stays empty.
+ */
+function followingEnd(prefill: Prefill | undefined, startText: string): string {
+  return prefill && prefilledEnd(prefill.end) !== '' ? startText : ''
+}
+
+/**
+ * A form to add an entry to the shown date. Until you type in it, it shows the prefill, and End follows Start until
+ * you change End. Add or Enter adds; after a successful add it shows the next prefill with focus on End.
+ * Cancel or Esc resets it to the prefill.
  */
 export function AddEntryRow({
   entries,
@@ -65,8 +76,10 @@ export function AddEntryRow({
   // Undefined while untouched, so a new prefill shows; set on the first change.
   const [typed, setTyped] = useState<Draft>()
   const [message, setMessage] = useState<string>()
+  const endRef = useRef<HTMLInputElement>(null)
   const draft = typed ?? untouchedDraft(prefill)
-  const { startText, endText, labelId, description } = draft
+  const { startText, labelId, description } = draft
+  const endText = draft.endText ?? followingEnd(prefill, startText)
 
   function change(changes: Partial<Draft>) {
     setTyped({ ...draft, ...changes })
@@ -98,6 +111,7 @@ export function AddEntryRow({
       return
     }
     clear()
+    endRef.current?.focus()
     onAdded()
   }
 
@@ -105,7 +119,10 @@ export function AddEntryRow({
     <form
       className="add-entry edit-row edit-grid"
       aria-label="Add entry"
+      noValidate
+      autoComplete="off"
       onSubmit={add}
+      onKeyDown={cancelOnEscape(clear)}
     >
       <input
         className="num"
@@ -116,6 +133,7 @@ export function AddEntryRow({
       <input
         className="num"
         aria-label="End"
+        ref={endRef}
         value={endText}
         onChange={(e) => change({ endText: e.target.value })}
       />
@@ -137,14 +155,21 @@ export function AddEntryRow({
         value={description}
         onChange={(e) => change({ description: e.target.value })}
       />
-      <button className="btn primary small" type="submit">
-        Add
-      </button>
       {message && (
         <p className="msg err" role="alert">
           {message}
         </p>
       )}
+      <div className="actions">
+        <button className="btn primary small" type="submit">
+          Add
+        </button>
+        <button className="btn small" type="button" onClick={clear}>
+          Cancel
+        </button>
+        <span className="spacer" />
+        <span className="keys">Enter saves · Esc cancels</span>
+      </div>
     </form>
   )
 }
