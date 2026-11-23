@@ -87,6 +87,8 @@ export function EntriesPage({
   const [day, setDay] = useState<Day>()
   // The id of the entry whose editor is open; at most one is open at a time.
   const [editing, setEditing] = useState<string>()
+  // The id of the entry whose editor closed last, whose row gets focus again.
+  const [closed, setClosed] = useState<string>()
 
   useEffect(() => {
     let current = true
@@ -98,13 +100,22 @@ export function EntriesPage({
     }
   }, [date, entries, labels])
 
-  /** Loads the shown date again, e.g. after an entry was added. */
-  async function reload() {
-    setDay(await loadDay(date, entries, labels))
+  /** Loads the shown date again, e.g. after an entry was added, and returns the loaded day. */
+  async function reload(): Promise<Day> {
+    const loaded = await loadDay(date, entries, labels)
+    setDay(loaded)
+    return loaded
+  }
+
+  /** Opens the editor of an entry, or closes it with undefined and puts focus back on its row. */
+  function edit(id: string | undefined) {
+    setClosed(id === undefined ? editing : undefined)
+    setEditing(id)
   }
 
   /** Shows another date, closing any open editor. */
   function goTo(other: Temporal.PlainDate) {
+    setClosed(undefined)
     setEditing(undefined)
     setDate(other)
   }
@@ -112,7 +123,7 @@ export function EntriesPage({
   /** Closes the editor after its entry was saved or deleted and shows the saved day. */
   async function closeEditor() {
     await reload()
-    setEditing(undefined)
+    edit(undefined)
   }
 
   const isToday = date.equals(today)
@@ -153,7 +164,8 @@ export function EntriesPage({
             day={shown}
             entries={entries}
             editing={editing}
-            onEdit={setEditing}
+            closed={closed}
+            onEdit={edit}
             onEdited={() => void closeEditor()}
           />
           {editing === undefined && (
@@ -164,7 +176,7 @@ export function EntriesPage({
               timeZone={timeZone}
               prefill={shown.prefill}
               warn={overlapWarning(shown, timeZone)}
-              onAdded={() => void reload()}
+              onAdded={async () => (await reload()).prefill}
             />
           )}
         </div>
@@ -178,6 +190,8 @@ interface DayEntriesProps {
   entries: EntryService
   /** The id of the entry whose editor is open, if any. */
   editing: string | undefined
+  /** The id of the entry whose editor closed last, whose row gets focus. */
+  closed: string | undefined
   /** Opens the editor of an entry, or closes it with undefined, discarding its changes. */
   onEdit: (id: string | undefined) => void
   /** Called after the open entry was saved or deleted. */
@@ -189,6 +203,7 @@ function DayEntries({
   day,
   entries,
   editing,
+  closed,
   onEdit,
   onEdited,
 }: DayEntriesProps) {
@@ -232,6 +247,7 @@ function DayEntries({
                   entry={entry}
                   label={labelOf(entry)}
                   overlaps={overlapIds.has(entry.id)}
+                  focused={closed === entry.id}
                   onOpen={() => onEdit(entry.id)}
                 />
               )}

@@ -19,8 +19,8 @@ interface AddEntryRowProps {
   prefill: Prefill | undefined
   /** Warns about the typed times, e.g. which entries they overlap. */
   warn: TimesWarning
-  /** Called after an entry was added. */
-  onAdded: () => void
+  /** Called after an entry was added; resolves to the prefill of the next entry. */
+  onAdded: () => Promise<Prefill | undefined>
 }
 
 /** The texts typed in the add row; End is undefined while untouched, so it follows Start. */
@@ -75,7 +75,8 @@ function followingEnd(prefill: Prefill | undefined, startText: string): string {
 
 /**
  * A form to add an entry to the shown date. Until you type in it, it shows the prefill, and End follows Start until
- * you change End. Add or Enter adds; after a successful add it shows the next prefill with focus on End.
+ * you change End. Add or Enter adds; after a successful add it shows the next prefill
+ * with focus on End, or on Start when there is no prefill.
  * Cancel or Esc resets it to the prefill.
  */
 export function AddEntryRow({
@@ -89,6 +90,7 @@ export function AddEntryRow({
 }: AddEntryRowProps) {
   // Undefined while untouched, so a new prefill shows; set on the first change.
   const [typed, setTyped] = useState<TypedDraft>()
+  const startRef = useRef<HTMLInputElement>(null)
   const endRef = useRef<HTMLInputElement>(null)
   const current = typed ?? untouchedDraft(prefill)
   const draft: Draft = {
@@ -100,10 +102,10 @@ export function AddEntryRow({
     ...choicesOf(labels),
   ]
 
-  function added() {
+  async function added() {
     setTyped(undefined)
-    endRef.current?.focus()
-    onAdded()
+    const next = await onAdded()
+    ;(next ? endRef : startRef).current?.focus()
   }
 
   return (
@@ -122,8 +124,9 @@ export function AddEntryRow({
         save={(fields: DraftFields) =>
           entries.add({ ...fields, date, timeZone })
         }
-        onDone={added}
+        onDone={() => void added()}
         onCancel={() => setTyped(undefined)}
+        startRef={startRef}
         endRef={endRef}
       />
     </div>
