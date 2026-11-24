@@ -71,9 +71,8 @@ export function ContractPanel({
   timeZone: string
 }) {
   const id = useId()
-  const [draft, setDraft] = useState(() =>
-    draftOf(defaultContract(todayIn(clock.now(), timeZone))),
-  )
+  // Undefined until the contract and its lock have loaded.
+  const [draft, setDraft] = useState<Draft>()
   const [locked, setLocked] = useState(false)
   const [message, setMessage] = useState<Message>()
 
@@ -81,23 +80,24 @@ export function ContractPanel({
     let current = true
     void (async () => {
       const contract = await contracts.current()
-      if (!contract) return
-      const isLocked = await contracts.isLocked(contract)
+      const isLocked = contract ? await contracts.isLocked(contract) : false
       if (!current) return
-      setDraft(draftOf(contract))
+      const today = todayIn(clock.now(), timeZone)
+      setDraft(draftOf(contract ?? defaultContract(today)))
       setLocked(isLocked)
     })()
     return () => {
       current = false
     }
-  }, [contracts])
+  }, [contracts, clock, timeZone])
 
   function change(fields: Partial<Draft>) {
-    setDraft((previous) => ({ ...previous, ...fields }))
+    setDraft((previous) => previous && { ...previous, ...fields })
   }
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (!draft) return
     const fields = fieldsOf(draft)
     if (typeof fields === 'string') {
       setMessage({ kind: 'error', text: fields })
@@ -113,12 +113,19 @@ export function ContractPanel({
     setMessage({ kind: 'saved', text: 'Contract saved' })
   }
 
-  return (
-    <section className="panel">
+  const intro = (
+    <>
       <h2>Contract</h2>
       <p className="hint">
         These settings drive how billed hours and the balance are calculated.
       </p>
+    </>
+  )
+  if (!draft) return <section className="panel">{intro}</section>
+
+  return (
+    <section className="panel">
+      {intro}
       <form className="contract-form" onSubmit={save}>
         <div className="fields">
           <div className="field">
