@@ -5,7 +5,7 @@ import { formatDateRange, formatMonthYear } from './dateText.ts'
 /** Shown in the summary when no contract is set up. */
 export const NO_CONTRACT_MESSAGE = 'Set up your contract in Settings'
 
-/** Shown in the summary when the shown day is before the contract start. */
+/** Shown in the summary when the shown period ends before the contract start. */
 export const BEFORE_CONTRACT_MESSAGE = 'Before your contract starts'
 
 /** The title of a period with the line under it: "Week 48" and its days, or the month. */
