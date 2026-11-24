@@ -112,3 +112,25 @@ test.each([
 ])('formatSignedMinutes(%i) is %s', (minutes, text) => {
   expect(formatSignedMinutes(minutes)).toBe(text)
 })
+
+// U+2212, the minus sign the app shows in its texts, next to the keyboard's "-".
+test.each([
+  ['−2:00', -120],
+  ['−2', -120],
+])(
+  'parseSignedHours(%j) with a real minus sign is %i minutes',
+  (text, minutes) => {
+    expect(parseSignedHours(text)).toBe(minutes)
+  },
+)
+
+test.each(['−', '−-2'])(
+  'parseSignedHours(%j) with a real minus sign is undefined',
+  (text) => {
+    expect(parseSignedHours(text)).toBeUndefined()
+  },
+)
+
+test('parseHours does not accept a real minus sign', () => {
+  expect(parseHours('−2:00')).toBeUndefined()
+})

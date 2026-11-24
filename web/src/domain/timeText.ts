@@ -55,11 +55,11 @@ export function parseHours(text: string): number | undefined {
   return Number(match[1]) * 60 + minute
 }
 
-/** Like `parseHours`, but with an optional `+` or `-` sign, e.g. `-2:00` as -120. */
+/** Like `parseHours`, but with an optional `+`, `-` or `−` (U+2212) sign, e.g. `-2:00` as -120. */
 export function parseSignedHours(text: string): number | undefined {
   const trimmed = text.trim()
-  const sign = trimmed[0] === '-' ? -1 : 1
-  const unsigned = /^[+-]/.test(trimmed) ? trimmed.slice(1) : trimmed
+  const sign = /^[-−]/.test(trimmed) ? -1 : 1
+  const unsigned = /^[+\-−]/.test(trimmed) ? trimmed.slice(1) : trimmed
   const minutes = parseHours(unsigned)
   return minutes === undefined ? undefined : sign * minutes
 }

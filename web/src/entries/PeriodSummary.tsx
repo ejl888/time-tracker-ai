@@ -175,7 +175,6 @@ function ExpectedMetric({
         className={error ? 'exp-input invalid' : 'exp-input'}
         id={id}
         type="text"
-        inputMode="decimal"
         placeholder="36"
         value={text}
         onChange={(e) => {

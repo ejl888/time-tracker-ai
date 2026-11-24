@@ -162,7 +162,6 @@ export function ContractPanel({
             <input
               type="text"
               id={`${id}-limit`}
-              inputMode="decimal"
               value={draft.limit}
               disabled={locked}
               onChange={(e) => change({ limit: e.target.value })}
@@ -186,7 +185,6 @@ export function ContractPanel({
             <input
               type="text"
               id={`${id}-balance`}
-              inputMode="decimal"
               value={draft.balance}
               onChange={(e) => change({ balance: e.target.value })}
             />
