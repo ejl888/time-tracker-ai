@@ -61,6 +61,7 @@ export function LabelsPage({ labels }: { labels: LabelService }) {
   return (
     <section className="panel">
       <h2>Labels</h2>
+      <p className="hint">Only billable labels count as worked hours.</p>
       {list.length > 0 && (
         <ul className="label-list">
           {list.map(({ label, used }) => (

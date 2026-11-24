@@ -91,6 +91,14 @@ test('lists the existing labels by name with their billable setting', async () =
   ])
 })
 
+test('says that only billable labels count as worked hours', async () => {
+  await renderPage()
+
+  expect(
+    screen.getByText('Only billable labels count as worked hours.'),
+  ).toBeInTheDocument()
+})
+
 test('adds a billable label by default and resets the form', async () => {
   const { user, nameField, billableBox, addButton } = await renderPage()
 
