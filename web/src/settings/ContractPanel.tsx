@@ -93,6 +93,7 @@ export function ContractPanel({
 
   function change(fields: Partial<Draft>) {
     setDraft((previous) => previous && { ...previous, ...fields })
+    setMessage(undefined)
   }
 
   /** Another cycle comes with its own default limit. */

@@ -360,6 +360,28 @@ async function storedContract(fields: ContractFields) {
   return { contracts, contract: saved.value }
 }
 
+test('removes "Contract saved" when a text field is edited', async () => {
+  const { user } = await renderPanel(savedContract)
+  await screen.findByDisplayValue('32:00')
+  await user.click(saveButton())
+  expect(await screen.findByRole('status')).toHaveTextContent('Contract saved')
+
+  await user.type(balanceField(), '1')
+
+  expect(screen.queryByRole('status')).not.toBeInTheDocument()
+})
+
+test('removes "Contract saved" when the billing cycle is switched', async () => {
+  const { user } = await renderPanel(savedContract)
+  await screen.findByDisplayValue('32:00')
+  await user.click(saveButton())
+  expect(await screen.findByRole('status')).toHaveTextContent('Contract saved')
+
+  await user.click(cycleButton('Month'))
+
+  expect(screen.queryByRole('status')).not.toBeInTheDocument()
+})
+
 test('shows no contract fields until the stored contract has loaded', async () => {
   const { contracts, contract } = await storedContract({
     ...savedContract,
@@ -439,3 +461,49 @@ test.each([
 
   expect([null, 'text']).toContain(field().getAttribute('inputmode'))
 })
+
+test('removes the error when the rejected limit is edited', async () => {
+  const { user } = await renderPanel()
+  await replace(user, limitField(), 'abc')
+  await user.click(saveButton())
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Use hours like 36 or 36:00',
+  )
+
+  await user.type(limitField(), '{Backspace}')
+
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+})
+
+test('removes the error when the billing cycle is switched', async () => {
+  const { user } = await renderPanel()
+  await replace(user, limitField(), 'abc')
+  await user.click(saveButton())
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Use hours like 36 or 36:00',
+  )
+
+  await user.click(cycleButton('Month'))
+
+  expect(limitField('month')).toHaveValue('156:00')
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+})
+
+test.each([
+  ['Contract start', () => startField(), '2026-11-16'],
+  ['Starting balance', () => balanceField(), '5:00'],
+])(
+  'removes the error of a refused contract when %s is edited',
+  async (_name, field, text) => {
+    const { user } = await renderPanel()
+    await replace(user, limitField(), '0:00')
+    await user.click(saveButton())
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The billable limit must be more than 0:00',
+    )
+
+    await replace(user, field(), text)
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  },
+)
