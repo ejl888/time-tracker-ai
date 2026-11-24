@@ -531,3 +531,10 @@ test('keeps the saved Expected value when returning before the other week has lo
     await act(async () => finishLoading(undefined))
   }
 })
+
+test('uses the normal keyboard for Expected', async () => {
+  await renderPage({ contract: weekly })
+
+  const field = await findExpected()
+  expect([null, 'text']).toContain(field.getAttribute('inputmode'))
+})

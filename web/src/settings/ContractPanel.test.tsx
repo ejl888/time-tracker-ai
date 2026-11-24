@@ -417,3 +417,25 @@ test('never enables the locked fields while the lock is still loading', async ()
   expect(cycleButton('Week')).toBeDisabled()
   expect(cycleButton('Month')).toBeDisabled()
 })
+
+test('saves a starting balance typed with a real minus sign', async () => {
+  const { user, contracts } = await renderPanel()
+
+  // U+2212, as in the help text, not the keyboard's "-".
+  await replace(user, balanceField(), '−2:00')
+  await user.click(saveButton())
+
+  expect(await screen.findByRole('status')).toHaveTextContent('Contract saved')
+  expect(await contracts.current()).toEqual(
+    expect.objectContaining({ startingBalance: -120 }),
+  )
+})
+
+test.each([
+  ['billable limit', () => limitField()],
+  ['starting balance', () => balanceField()],
+])('uses the normal keyboard for the %s', async (_name, field) => {
+  await renderPanel()
+
+  expect([null, 'text']).toContain(field().getAttribute('inputmode'))
+})
