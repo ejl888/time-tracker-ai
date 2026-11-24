@@ -17,23 +17,10 @@ import {
 } from './summaryMessages.ts'
 import './summary.css'
 
-/** The contract and expected minutes loaded for a date. */
-interface Loaded {
-  date: Temporal.PlainDate
-  contract: Contract | undefined
+/** The expected minutes loaded for the period that starts on `periodStart`. */
+interface LoadedExpected {
+  periodStart: string
   expected: number | undefined
-}
-
-/** Loads the contract and the expected minutes of the period that contains the date. */
-async function loadSummary(
-  date: Temporal.PlainDate,
-  contracts: ContractService,
-): Promise<Loaded> {
-  const contract = await contracts.current()
-  if (!contract) return { date, contract, expected: undefined }
-  const { start } = periodOf(date, contract.billingCycle)
-  const expected = await contracts.expectedFor(contract, start.toString())
-  return { date, contract, expected }
 }
 
 /** The summary bar above the day: the period of the day and its expected billable hours. */
@@ -44,37 +31,64 @@ export function PeriodSummary({
   contracts: ContractService
   date: Temporal.PlainDate
 }) {
-  const [loaded, setLoaded] = useState<Loaded>()
+  // The current contract: undefined while loading, null when there is none.
+  const [contract, setContract] = useState<Contract | null>()
+  const [loaded, setLoaded] = useState<LoadedExpected>()
 
   useEffect(() => {
     let current = true
-    void loadSummary(date, contracts).then((summary) => {
-      if (current) setLoaded(summary)
+    void contracts.current().then((found) => {
+      if (current) setContract(found ?? null)
     })
     return () => {
       current = false
     }
-  }, [date, contracts])
+  }, [contracts])
 
-  const shown = loaded?.date.equals(date) ? loaded : undefined
+  const period = contract ? periodOf(date, contract.billingCycle) : undefined
+  // Loaded per period start, so moving to another day of the period keeps what is shown.
+  const periodStart = period?.start.toString()
+
+  useEffect(() => {
+    if (!contract || periodStart === undefined) return
+    let current = true
+    void contracts.expectedFor(contract, periodStart).then((expected) => {
+      if (current) setLoaded({ periodStart, expected })
+    })
+    return () => {
+      current = false
+    }
+  }, [contract, periodStart, contracts])
+
+  const shown = loaded?.periodStart === periodStart ? loaded : undefined
 
   return (
     <section className="summary" aria-label="Period summary">
-      {shown && <SummaryContent contracts={contracts} loaded={shown} />}
+      {contract === null && <p className="hint">{NO_CONTRACT_MESSAGE}</p>}
+      {contract && period && shown && (
+        <SummaryContent
+          contracts={contracts}
+          contract={contract}
+          period={period}
+          expected={shown.expected}
+        />
+      )}
     </section>
   )
 }
 
-/** The note without a contract or before its start, else the period with its Expected metric. */
+/** The note before the contract start, else the period with its Expected metric. */
 function SummaryContent({
   contracts,
-  loaded: { date, contract, expected },
+  contract,
+  period,
+  expected,
 }: {
   contracts: ContractService
-  loaded: Loaded
+  contract: Contract
+  period: Period
+  expected: number | undefined
 }) {
-  if (!contract) return <p className="hint">{NO_CONTRACT_MESSAGE}</p>
-  const period = periodOf(date, contract.billingCycle)
   if (!coversPeriod(contract, period)) {
     return <p className="hint">{BEFORE_CONTRACT_MESSAGE}</p>
   }
@@ -164,9 +178,11 @@ function ExpectedMetric({
         }}
         onBlur={() => void save()}
         onKeyDown={saveOnEnter}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${id}-error` : undefined}
       />
       {error ? (
-        <span className="n err" role="alert">
+        <span className="n err" id={`${id}-error`} role="alert">
           {error}
         </span>
       ) : (
