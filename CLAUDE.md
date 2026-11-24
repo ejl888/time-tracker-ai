@@ -23,6 +23,11 @@ See [docs/roadmap.md](docs/roadmap.md) for phases and design decisions.
   issue with the `idea` label (title, context, questions raised so far) and continue the current work.
   Decisions from a parked issue get their own branch and PR, never a commit on an unrelated branch.
 - **Pick up parked topics between PRs.** After each merge, list the open `idea` issues so the owner chooses what's next.
+- **Fold in review fixes before the PR.** Fold a fix into the commit it corrects before opening the
+  PR, instead of adding fix commits at the end.
+- **Rework makes a PR a draft.** When an open PR needs changes, make it a draft straight away; mark it ready only after
+  the push and green CI.
+- **Only the owner merges.** Claude never merges a pull request, not even when CI is green.
 - **Scope check before a PR.** List the branch's commits and flag any that don't fit the PR's purpose;
   move those to their own branch before opening the PR.
 
