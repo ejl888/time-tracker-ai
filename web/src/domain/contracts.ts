@@ -14,7 +14,11 @@ export type ContractFields = Pick<
 >
 
 export type ContractError =
-  'limit-not-positive' | 'contract-locked' | 'negative' | 'not-a-period-start'
+  | 'limit-not-positive'
+  | 'contract-locked'
+  | 'negative'
+  | 'not-a-period-start'
+  | 'invalid-start-date'
 
 /** Fields that cannot change once expected hours exist for the contract. */
 const LOCKED_FIELDS = ['billingCycle', 'startDate', 'billableLimit'] as const
@@ -45,6 +49,17 @@ export function billedMinutes(
   expected: number | undefined,
 ): number {
   return Math.min(limit, expected ?? 0)
+}
+
+/** Whether the text is an existing date written as YYYY-MM-DD. */
+function isIsoDate(text: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return false
+  try {
+    Temporal.PlainDate.from(text)
+    return true
+  } catch {
+    return false
+  }
 }
 
 /** Whether the date is the first day of a period of the cycle. */
@@ -168,6 +183,9 @@ export function createContractService(
     ): Promise<Result<Contract, ContractError>> {
       if (fields.billableLimit <= 0) {
         return { ok: false, error: 'limit-not-positive' }
+      }
+      if (!isIsoDate(fields.startDate)) {
+        return { ok: false, error: 'invalid-start-date' }
       }
       const existing = await current()
       return existing ? update(existing, fields) : create(fields)
