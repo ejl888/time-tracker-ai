@@ -320,3 +320,57 @@ test('shows the week that holds a midweek contract start, with its Expected fiel
     expect(await contracts.expectedFor(contract!, '2026-11-23')).toBe(36 * 60)
   })
 })
+
+test('keeps the Expected value when moving to another day in the same week', async () => {
+  const { user } = await renderPage({ contract: weekly })
+
+  const field = await findExpected()
+  await user.type(field, '40')
+  await user.tab()
+  await waitFor(() => expect(field).toHaveValue('40:00'))
+
+  // Records whether the Expected field ever leaves the summary while the day changes.
+  const region = screen.getByRole('region', { name: 'Period summary' })
+  let emptied = false
+  const observer = new MutationObserver(() => {
+    if (!within(region).queryByRole('textbox', { name: 'Expected' })) {
+      emptied = true
+    }
+  })
+  observer.observe(region, { childList: true, subtree: true })
+
+  await user.click(screen.getByRole('button', { name: 'Previous day' }))
+  await screen.findByRole('heading', { name: 'Tuesday 24 November 2026' })
+
+  observer.disconnect()
+  expect(region).toBeInTheDocument()
+  expect(within(region).getByText('Week 48')).toBeInTheDocument()
+  expect(within(region).getByRole('textbox', { name: 'Expected' })).toHaveValue(
+    '40:00',
+  )
+  expect(emptied).toBe(false)
+})
+
+test('marks the Expected field invalid and links it to the message', async () => {
+  const { user } = await renderPage({ contract: weekly })
+
+  const field = await findExpected()
+  await user.type(field, 'abc')
+  await user.tab()
+
+  const summary = await findSummary()
+  const alert = await summary.findByRole('alert')
+  expect(field).toHaveAttribute('aria-invalid', 'true')
+  const describedBy = field.getAttribute('aria-describedby')
+  expect(describedBy).toBeTruthy()
+  expect(describedBy!.split(' ')).toContain(alert.id)
+  expect(field).toHaveAccessibleDescription('Use hours like 36 or 36:00')
+
+  await user.clear(field)
+  await user.type(field, '36')
+  await user.tab()
+
+  await waitFor(() => expect(field).toHaveValue('36:00'))
+  expect(summary.queryByRole('alert')).not.toBeInTheDocument()
+  expect(field.getAttribute('aria-invalid') ?? 'false').toBe('false')
+})
