@@ -120,6 +120,14 @@ _Priority: **Must** (first version), **Should** (soon after), **Could** (later).
 - Billed hours are not shown separately; when the expected billable hours exceed the limit, a note says they are capped.
 - Expected billable hours are entered once the period has started; future periods cannot be opened.
 - When no expected billable hours are entered for a period, billed hours are 0.
+- The period that holds the contract start is the first period, with the full limit; earlier periods have no expected
+  billable hours.
+- Expected billable hours, the billable limit and the starting balance are entered as whole hours or `H:MM` (e.g. `36`
+  or `7:30`), without decimals. The starting balance may have a sign; both `-` and `−` work. Unlike in the prototype,
+  these fields use the normal keyboard, as the decimal keypad of phones has no `:` or `-`.
+- Esc in the expected billable hours restores the last saved value.
+- The default billable limit is 36:00 per week and 156:00 per month. Choosing another billing cycle replaces the limit
+  with its default.
 - Weeks run from Monday to Sunday.
 - Every entry needs a label; the description is optional.
 - A label's billable setting cannot be changed once an entry (not deleted) uses it, so earlier periods never change.
