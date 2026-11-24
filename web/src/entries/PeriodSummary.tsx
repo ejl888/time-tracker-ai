@@ -57,6 +57,8 @@ export function PeriodSummary({
     })
     return () => {
       current = false
+      // Returning to this period loads it again, as its value may have been saved since.
+      setLoaded(undefined)
     }
   }, [contract, periodStart, contracts])
 

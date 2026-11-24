@@ -1,7 +1,7 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Temporal } from 'temporal-polyfill'
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 import { fixedClock } from '../domain/clock.ts'
 import {
   type ContractFields,
@@ -373,4 +373,43 @@ test('marks the Expected field invalid and links it to the message', async () =>
   await waitFor(() => expect(field).toHaveValue('36:00'))
   expect(summary.queryByRole('alert')).not.toBeInTheDocument()
   expect(field.getAttribute('aria-invalid') ?? 'false').toBe('false')
+})
+
+test('keeps the saved Expected value when returning before the other week has loaded', async () => {
+  const { user, contracts, contract } = await renderPage({
+    today: '2026-11-23',
+    contract: weekly,
+    expected: { '2026-11-23': 32 * 60 },
+  })
+  const field = await findExpected()
+  await user.clear(field)
+  await user.type(field, '40')
+  await user.tab()
+  await waitFor(() => expect(field).toHaveValue('40:00'))
+
+  // Week 47 stays loading until the end of the test.
+  let finishLoading!: (expected: number | undefined) => void
+  const loading = new Promise<number | undefined>((resolve) => {
+    finishLoading = resolve
+  })
+  const load = contracts.expectedFor
+  vi.spyOn(contracts, 'expectedFor').mockImplementation((of, periodStart) =>
+    periodStart === '2026-11-16' ? loading : load(of, periodStart),
+  )
+
+  try {
+    await user.click(screen.getByRole('button', { name: 'Previous day' }))
+    await screen.findByRole('heading', { name: 'Sunday 22 November 2026' })
+    await user.click(screen.getByRole('button', { name: 'Next day' }))
+    await screen.findByRole('heading', { name: 'Monday 23 November 2026' })
+
+    await waitFor(async () => expect(await findExpected()).toHaveValue('40:00'))
+    await user.click(await findExpected())
+    await user.tab()
+
+    expect(await findExpected()).toHaveValue('40:00')
+    expect(await contracts.expectedFor(contract!, '2026-11-23')).toBe(40 * 60)
+  } finally {
+    await act(async () => finishLoading(undefined))
+  }
 })
