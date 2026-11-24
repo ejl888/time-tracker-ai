@@ -1,7 +1,7 @@
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Temporal } from 'temporal-polyfill'
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 import { fixedClock } from '../domain/clock.ts'
 import {
   type ContractFields,
@@ -284,4 +284,83 @@ test('asks for a start date when Contract start is cleared and stores nothing', 
   )
   expect(screen.queryByRole('status')).not.toBeInTheDocument()
   expect(await contracts.current()).toBeUndefined()
+})
+
+/** A promise that is resolved by hand. */
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((done) => {
+    resolve = done
+  })
+  return { promise, resolve }
+}
+
+/** A service with a stored contract, for tests that hold its answers pending. */
+async function storedContract(fields: ContractFields) {
+  const contracts = createContractService(
+    new InMemoryRepository<Contract>(),
+    new InMemoryRepository<ExpectedHours>(),
+    clock,
+  )
+  const saved = await contracts.save(fields)
+  if (!saved.ok) throw new Error(`could not seed contract: ${saved.error}`)
+  return { contracts, contract: saved.value }
+}
+
+test('shows no contract fields until the stored contract has loaded', async () => {
+  const { contracts, contract } = await storedContract({
+    ...savedContract,
+    billableLimit: 40 * 60,
+  })
+  const loading = deferred<Contract | undefined>()
+  const current = vi
+    .spyOn(contracts, 'current')
+    .mockReturnValue(loading.promise)
+
+  render(
+    <ContractPanel contracts={contracts} clock={clock} timeZone={timeZone} />,
+  )
+  await waitFor(() => expect(current).toHaveBeenCalled())
+
+  expect(screen.queryAllByRole('textbox')).toHaveLength(0)
+  expect(screen.queryByLabelText('Contract start')).not.toBeInTheDocument()
+  expect(
+    screen.queryByRole('group', { name: 'Billing cycle' }),
+  ).not.toBeInTheDocument()
+
+  await act(async () => loading.resolve(contract))
+
+  expect(await screen.findByDisplayValue('40:00')).toBe(limitField())
+})
+
+test('never enables the locked fields while the lock is still loading', async () => {
+  const { contracts } = await storedContract(savedContract)
+  const loading = deferred<boolean>()
+  const isLocked = vi
+    .spyOn(contracts, 'isLocked')
+    .mockReturnValue(loading.promise)
+
+  render(
+    <ContractPanel contracts={contracts} clock={clock} timeZone={timeZone} />,
+  )
+  await waitFor(() => expect(isLocked).toHaveBeenCalled())
+  // Lets any update that does not wait for the lock show up.
+  await act(async () => {})
+
+  for (const field of [
+    screen.queryByRole('textbox', { name: /^Billable limit/ }),
+    screen.queryByLabelText('Contract start'),
+    screen.queryByRole('button', { name: 'Week' }),
+    screen.queryByRole('button', { name: 'Month' }),
+  ]) {
+    if (field) expect(field).toBeDisabled()
+  }
+
+  await act(async () => loading.resolve(true))
+
+  expect(await screen.findByDisplayValue('32:00')).toBe(limitField())
+  expect(limitField()).toBeDisabled()
+  expect(startField()).toBeDisabled()
+  expect(cycleButton('Week')).toBeDisabled()
+  expect(cycleButton('Month')).toBeDisabled()
 })
