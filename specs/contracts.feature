@@ -42,3 +42,14 @@ Feature: Contract and expected billable hours
       Given I expect to bill 36:00 in the week of 2026-10-05
       When I change the starting balance to 5:00
       Then the change is saved
+
+  Rule: The period that holds the contract start is the first period
+
+    Scenario: Expected hours can be entered for the week the contract starts in, even midweek
+      Given I change the contract start to 2026-10-07
+      When I enter 36:00 as the expected billable hours for the week of 2026-10-05
+      Then the change is saved
+
+    Scenario: Expected hours for a period before the contract start are rejected
+      When I enter 36:00 as the expected billable hours for the week of 2026-09-28
+      Then the change is rejected

@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, test } from 'vitest'
 import { Temporal } from 'temporal-polyfill'
 import type { Clock } from './clock.ts'
-import { billedMinutes, createContractService, periodOf } from './contracts.ts'
+import {
+  billedMinutes,
+  coversPeriod,
+  createContractService,
+  periodOf,
+} from './contracts.ts'
 import type { ContractFields } from './contracts.ts'
 import type { Contract, ExpectedHours } from './records.ts'
 import { InMemoryRepository } from './repository.ts'
@@ -59,6 +64,29 @@ test.each([
 ])('billedMinutes(limit %i, expected %s) is %i', (limit, expected, billed) => {
   expect(billedMinutes(limit, expected)).toBe(billed)
 })
+
+// The period that holds the contract start is the first period; periods that
+// end before the start are not covered by the contract.
+test.each<[string, Contract['billingCycle'], string, boolean]>([
+  ['2026-11-25', 'week', '2026-11-23', true],
+  ['2026-11-25', 'week', '2026-11-29', true],
+  ['2026-11-25', 'week', '2026-11-30', true],
+  ['2026-11-25', 'week', '2026-11-22', false],
+  ['2026-11-25', 'week', '2026-11-16', false],
+  ['2026-11-23', 'week', '2026-11-23', true],
+  ['2026-11-23', 'week', '2026-11-22', false],
+  ['2026-11-15', 'month', '2026-11-01', true],
+  ['2026-11-15', 'month', '2026-11-30', true],
+  ['2026-11-15', 'month', '2026-12-10', true],
+  ['2026-11-15', 'month', '2026-10-31', false],
+  ['2026-11-15', 'month', '2026-10-15', false],
+])(
+  'a contract starting %s (%s cycle) covers the period of %s: %s',
+  (startDate, billingCycle, day, covered) => {
+    const period = periodOf(date(day), billingCycle)
+    expect(coversPeriod({ startDate, billingCycle }, period)).toBe(covered)
+  },
+)
 
 describe('contract service', () => {
   const t1 = Temporal.Instant.from('2026-10-05T09:00:00Z')
@@ -197,6 +225,42 @@ describe('contract service', () => {
 
     expect(onMonday).toEqual({ ok: false, error: 'not-a-period-start' })
     expect(onFirst.ok).toBe(true)
+  })
+
+  test('expected hours for a period that ends before the contract start are rejected', async () => {
+    const contract = await createContract()
+
+    const result = await service.setExpected(contract, '2026-09-28', 2160)
+
+    expect(result).toEqual({ ok: false, error: 'before-contract-start' })
+    expect(await expectedHours.all()).toHaveLength(0)
+  })
+
+  test('expected hours can be entered for the week that holds a midweek start', async () => {
+    const result = await service.save({ ...fields, startDate: '2026-11-25' })
+    if (!result.ok) throw new Error(`save failed: ${result.error}`)
+
+    const before = await service.setExpected(result.value, '2026-11-16', 2160)
+    const holding = await service.setExpected(result.value, '2026-11-23', 2160)
+
+    expect(before).toEqual({ ok: false, error: 'before-contract-start' })
+    expect(holding.ok).toBe(true)
+    expect(await service.expectedFor(result.value, '2026-11-23')).toBe(2160)
+  })
+
+  test('expected hours can be entered for the month that holds a mid-month start', async () => {
+    const result = await service.save({
+      ...fields,
+      startDate: '2026-11-15',
+      billingCycle: 'month',
+    })
+    if (!result.ok) throw new Error(`save failed: ${result.error}`)
+
+    const october = await service.setExpected(result.value, '2026-10-01', 9000)
+    const november = await service.setExpected(result.value, '2026-11-01', 9000)
+
+    expect(october).toEqual({ ok: false, error: 'before-contract-start' })
+    expect(november.ok).toBe(true)
   })
 
   test.each(['', 'x', '2026-02-30', '25-11-2026'])(

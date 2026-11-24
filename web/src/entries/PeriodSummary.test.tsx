@@ -299,3 +299,24 @@ test('says the day is before the contract start instead of showing the Expected 
     summary.queryByRole('textbox', { name: 'Expected' }),
   ).not.toBeInTheDocument()
 })
+
+test('shows the week that holds a midweek contract start, with its Expected field', async () => {
+  const { user, contracts, contract } = await renderPage({
+    today: '2026-11-23',
+    contract: { ...weekly, startDate: '2026-11-25' },
+  })
+
+  const summary = await findSummary()
+  expect(await summary.findByText('Week 48')).toBeInTheDocument()
+  expect(
+    summary.queryByText('Before your contract starts'),
+  ).not.toBeInTheDocument()
+
+  const field = await findExpected()
+  await user.type(field, '36')
+  await user.tab()
+
+  await waitFor(async () => {
+    expect(await contracts.expectedFor(contract!, '2026-11-23')).toBe(36 * 60)
+  })
+})
