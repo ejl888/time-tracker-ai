@@ -6,7 +6,7 @@ import type {
   ContractFields,
   ContractService,
 } from '../domain/contracts.ts'
-import { defaultContract } from '../domain/contracts.ts'
+import { defaultContract, defaultLimit } from '../domain/contracts.ts'
 import { todayIn } from '../domain/entries.ts'
 import {
   formatMinutes,
@@ -95,6 +95,12 @@ export function ContractPanel({
     setDraft((previous) => previous && { ...previous, ...fields })
   }
 
+  /** Another cycle comes with its own default limit. */
+  function chooseCycle(cycle: BillingCycle) {
+    if (cycle === draft?.cycle) return
+    change({ cycle, limit: formatMinutes(defaultLimit(cycle)) })
+  }
+
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!draft) return
@@ -139,7 +145,7 @@ export function ContractPanel({
                   type="button"
                   aria-pressed={draft.cycle === cycle}
                   disabled={locked}
-                  onClick={() => change({ cycle })}
+                  onClick={() => chooseCycle(cycle)}
                 >
                   {title}
                 </button>

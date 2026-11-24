@@ -6,6 +6,7 @@ import {
   coversPeriod,
   createContractService,
   defaultContract,
+  defaultLimit,
   periodOf,
 } from './contracts.ts'
 import type { ContractFields } from './contracts.ts'
@@ -104,6 +105,13 @@ test.each([
     })
   },
 )
+
+test.each([
+  ['week', 2160],
+  ['month', 9360],
+] as const)('the default limit per %s is %i minutes', (cycle, minutes) => {
+  expect(defaultLimit(cycle)).toBe(minutes)
+})
 
 describe('contract service', () => {
   const t1 = Temporal.Instant.from('2026-10-05T09:00:00Z')

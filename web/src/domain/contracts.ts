@@ -44,11 +44,16 @@ export function periodOf(
   return { start, end: start.add({ days: 6 }), week: date.weekOfYear }
 }
 
+/** The billable limit proposed for a billing cycle: 36:00 per week or 156:00 per month. */
+export function defaultLimit(cycle: BillingCycle): number {
+  return cycle === 'month' ? 156 * 60 : 36 * 60
+}
+
 /** The contract proposed before one is saved: a week of 36:00 from Monday of this week. */
 export function defaultContract(today: Temporal.PlainDate): ContractFields {
   return {
     billingCycle: 'week',
-    billableLimit: 36 * 60,
+    billableLimit: defaultLimit('week'),
     startDate: periodOf(today, 'week').start.toString(),
     startingBalance: 0,
   }

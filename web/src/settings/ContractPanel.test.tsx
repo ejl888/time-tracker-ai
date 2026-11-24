@@ -133,6 +133,59 @@ test('speaks of a month when the monthly cycle is chosen', async () => {
   ).toBeInTheDocument()
 })
 
+test('sets the limit that fits the chosen billing cycle', async () => {
+  const { user } = await renderPanel()
+
+  await user.click(cycleButton('Month'))
+  expect(limitField('month')).toHaveValue('156:00')
+
+  await user.click(cycleButton('Week'))
+  expect(limitField('week')).toHaveValue('36:00')
+})
+
+test('replaces a typed limit when another billing cycle is chosen', async () => {
+  const { user } = await renderPanel()
+
+  await replace(user, limitField(), '40')
+  await user.click(cycleButton('Month'))
+  expect(limitField('month')).toHaveValue('156:00')
+
+  await replace(user, limitField('month'), '140')
+  await user.click(cycleButton('Week'))
+  expect(limitField('week')).toHaveValue('36:00')
+})
+
+test.each([
+  ['Week', 'week', '40'],
+  ['Month', 'month', '140'],
+] as const)(
+  'keeps a typed limit when the selected cycle %s is clicked again',
+  async (name, cycle, limit) => {
+    const { user } = await renderPanel({
+      ...savedContract,
+      billingCycle: cycle,
+    })
+
+    await replace(user, limitField(cycle), limit)
+    await user.click(cycleButton(name))
+
+    expect(cycleButton(name)).toHaveAttribute('aria-pressed', 'true')
+    expect(limitField(cycle)).toHaveValue(limit)
+  },
+)
+
+test('saves the limit that came with the chosen billing cycle', async () => {
+  const { user, contracts } = await renderPanel()
+
+  await user.click(cycleButton('Month'))
+  await user.click(saveButton())
+
+  expect(await screen.findByRole('status')).toHaveTextContent('Contract saved')
+  expect(await contracts.current()).toEqual(
+    expect.objectContaining({ billingCycle: 'month', billableLimit: 9360 }),
+  )
+})
+
 test('saves the defaults as the contract', async () => {
   const { user, contracts } = await renderPanel()
 
