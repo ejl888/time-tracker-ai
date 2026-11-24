@@ -44,6 +44,16 @@ export function periodOf(
   return { start, end: start.add({ days: 6 }), week: date.weekOfYear }
 }
 
+/** The contract proposed before one is saved: a week of 36:00 from Monday of this week. */
+export function defaultContract(today: Temporal.PlainDate): ContractFields {
+  return {
+    billingCycle: 'week',
+    billableLimit: 36 * 60,
+    startDate: periodOf(today, 'week').start.toString(),
+    startingBalance: 0,
+  }
+}
+
 /** Billed minutes of a period: the expected minutes capped at the limit; nothing entered is 0. */
 export function billedMinutes(
   limit: number,

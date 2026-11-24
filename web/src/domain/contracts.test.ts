@@ -5,6 +5,7 @@ import {
   billedMinutes,
   coversPeriod,
   createContractService,
+  defaultContract,
   periodOf,
 } from './contracts.ts'
 import type { ContractFields } from './contracts.ts'
@@ -85,6 +86,22 @@ test.each<[string, Contract['billingCycle'], string, boolean]>([
   (startDate, billingCycle, day, covered) => {
     const period = periodOf(date(day), billingCycle)
     expect(coversPeriod({ startDate, billingCycle }, period)).toBe(covered)
+  },
+)
+
+test.each([
+  ['Monday', '2026-11-23'],
+  ['Wednesday', '2026-11-25'],
+  ['Sunday', '2026-11-29'],
+])(
+  'the default contract on a %s starts on Monday of that week',
+  (_day, today) => {
+    expect(defaultContract(date(today))).toEqual({
+      billingCycle: 'week',
+      billableLimit: 2160,
+      startDate: '2026-11-23',
+      startingBalance: 0,
+    })
   },
 )
 
@@ -350,5 +367,25 @@ describe('contract service', () => {
 
     expect(result.ok).toBe(true)
     expect(await service.current()).toMatchObject(fields)
+  })
+
+  test('a new contract is not locked', async () => {
+    const contract = await createContract()
+
+    expect(await service.isLocked(contract)).toBe(false)
+  })
+
+  test('a contract is locked after expected hours are set', async () => {
+    const contract = await createContract()
+    await service.setExpected(contract, '2026-10-05', 2160)
+
+    expect(await service.isLocked(contract)).toBe(true)
+  })
+
+  test('a contract is not locked anymore after its expected hours are cleared', async () => {
+    const contract = await lockedContract()
+    await service.setExpected(contract, '2026-10-05', undefined)
+
+    expect(await service.isLocked(contract)).toBe(false)
   })
 })

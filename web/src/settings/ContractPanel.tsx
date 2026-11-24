@@ -6,9 +6,8 @@ import type {
   ContractFields,
   ContractService,
 } from '../domain/contracts.ts'
-import { periodOf } from '../domain/contracts.ts'
+import { defaultContract } from '../domain/contracts.ts'
 import { todayIn } from '../domain/entries.ts'
-import type { Contract } from '../domain/records.ts'
 import {
   formatMinutes,
   formatSignedMinutes,
@@ -36,24 +35,13 @@ const CYCLES: { cycle: BillingCycle; title: string }[] = [
   { cycle: 'month', title: 'Month' },
 ]
 
-/** The form for a saved contract. */
-function draftOf(contract: Contract): Draft {
+/** The form for a saved or default contract. */
+function draftOf(contract: ContractFields): Draft {
   return {
     cycle: contract.billingCycle,
     limit: formatMinutes(contract.billableLimit),
     start: contract.startDate,
     balance: formatSignedMinutes(contract.startingBalance),
-  }
-}
-
-/** The form before any contract is saved: a week of 36:00 from Monday of this week. */
-function defaultDraft(clock: Clock, timeZone: string): Draft {
-  const today = todayIn(clock.now(), timeZone)
-  return {
-    cycle: 'week',
-    limit: formatMinutes(36 * 60),
-    start: periodOf(today, 'week').start.toString(),
-    balance: formatSignedMinutes(0),
   }
 }
 
@@ -83,7 +71,9 @@ export function ContractPanel({
   timeZone: string
 }) {
   const id = useId()
-  const [draft, setDraft] = useState(() => defaultDraft(clock, timeZone))
+  const [draft, setDraft] = useState(() =>
+    draftOf(defaultContract(todayIn(clock.now(), timeZone))),
+  )
   const [locked, setLocked] = useState(false)
   const [message, setMessage] = useState<Message>()
 
