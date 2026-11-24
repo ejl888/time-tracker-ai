@@ -98,7 +98,7 @@ function SummaryContent({
   return (
     <>
       <div className="ptitle">
-        <span className="period-name">{title}</span>
+        <h2 className="period-name">{title}</h2>
         <span className="period-sub">{sub}</span>
       </div>
       <ExpectedMetric
@@ -164,11 +164,11 @@ function ExpectedMetric({
 
   return (
     <div className="metric">
-      <label className="k" htmlFor={id}>
+      <label className="k" htmlFor={id} title="Expected billable hours">
         Expected
       </label>
       <input
-        className="exp-input"
+        className={error ? 'exp-input invalid' : 'exp-input'}
         id={id}
         type="text"
         inputMode="decimal"

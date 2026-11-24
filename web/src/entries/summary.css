@@ -30,6 +30,7 @@
   font-weight: 600;
   font-size: 18px;
   text-wrap: balance;
+  margin: 0;
 }
 .period-sub {
   color: var(--muted);
@@ -72,6 +73,9 @@
   border-radius: 6px;
   padding: 2px 8px;
   background: var(--bg);
+}
+.exp-input.invalid {
+  border-color: var(--bad);
 }
 
 /* Phones: the period name and its dates on one line. */

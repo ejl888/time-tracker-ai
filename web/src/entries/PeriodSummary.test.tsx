@@ -375,6 +375,46 @@ test('marks the Expected field invalid and links it to the message', async () =>
   expect(field.getAttribute('aria-invalid') ?? 'false').toBe('false')
 })
 
+test('shows the period title as a level 2 heading', async () => {
+  await renderPage({ contract: weekly })
+
+  const summary = await findSummary()
+  expect(
+    await summary.findByRole('heading', { level: 2, name: 'Week 48' }),
+  ).toBeInTheDocument()
+})
+
+test('explains the Expected label in a tooltip and keeps the field name', async () => {
+  await renderPage({ contract: weekly })
+
+  const field = await findExpected()
+  expect(field).toHaveAccessibleName('Expected')
+  const summary = await findSummary()
+  expect(summary.getByText('Expected')).toHaveAttribute(
+    'title',
+    'Expected billable hours',
+  )
+})
+
+test('gives the Expected field the invalid class until a valid value is saved', async () => {
+  const { user, contracts, contract } = await renderPage({ contract: weekly })
+
+  const field = await findExpected()
+  expect(field).not.toHaveClass('invalid')
+  await user.type(field, 'abc')
+  await user.tab()
+  await (await findSummary()).findByRole('alert')
+  expect(field).toHaveClass('invalid')
+
+  await user.clear(field)
+  await user.type(field, '36')
+  await user.tab()
+
+  await waitFor(() => expect(field).toHaveValue('36:00'))
+  expect(await contracts.expectedFor(contract!, '2026-11-23')).toBe(36 * 60)
+  expect(field).not.toHaveClass('invalid')
+})
+
 test('keeps the saved Expected value when returning before the other week has loaded', async () => {
   const { user, contracts, contract } = await renderPage({
     today: '2026-11-23',
