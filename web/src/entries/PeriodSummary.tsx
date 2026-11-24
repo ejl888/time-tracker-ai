@@ -157,9 +157,13 @@ function ExpectedMetric({
     setText(textOf(typed))
   }
 
-  function saveOnEnter(event: KeyboardEvent<HTMLInputElement>) {
+  function handleKey(event: KeyboardEvent<HTMLInputElement>) {
     // Leaving the field saves it, so Enter only leaves it.
     if (event.key === 'Enter') event.currentTarget.blur()
+    if (event.key === 'Escape') {
+      setText(textOf(saved))
+      setError(undefined)
+    }
   }
 
   return (
@@ -179,7 +183,7 @@ function ExpectedMetric({
           setError(undefined)
         }}
         onBlur={() => void save()}
-        onKeyDown={saveOnEnter}
+        onKeyDown={handleKey}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${id}-error` : undefined}
       />

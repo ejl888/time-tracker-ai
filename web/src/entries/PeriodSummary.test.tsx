@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Temporal } from 'temporal-polyfill'
-import { expect, test, vi } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 import { fixedClock } from '../domain/clock.ts'
 import {
   type ContractFields,
@@ -413,6 +413,84 @@ test('gives the Expected field the invalid class until a valid value is saved', 
   await waitFor(() => expect(field).toHaveValue('36:00'))
   expect(await contracts.expectedFor(contract!, '2026-11-23')).toBe(36 * 60)
   expect(field).not.toHaveClass('invalid')
+})
+
+describe.each<[string, Record<string, number>, string, number | undefined]>([
+  ['a stored value', { '2026-11-23': 32 * 60 }, '32:00', 32 * 60],
+  ['no stored value', {}, '', undefined],
+])('Escape in the Expected field with %s', (_name, expected, text, stored) => {
+  test('restores the saved text and stores nothing, also when the field is left', async () => {
+    const { user, contracts, contract } = await renderPage({
+      contract: weekly,
+      expected,
+    })
+    const setExpected = vi.spyOn(contracts, 'setExpected')
+
+    const field = await findExpected()
+    await user.clear(field)
+    await user.type(field, '40')
+    await user.keyboard('{Escape}')
+    expect(field).toHaveValue(text)
+
+    await user.tab()
+
+    expect(field).toHaveValue(text)
+    // Saving the unchanged value would be harmless; the typed one must never be saved.
+    expect(setExpected).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      40 * 60,
+    )
+    expect(await contracts.expectedFor(contract!, '2026-11-23')).toBe(stored)
+  })
+
+  test('clears the error and stores nothing, also when the field is left', async () => {
+    const { user, contracts, contract } = await renderPage({
+      contract: weekly,
+      expected,
+    })
+
+    const field = await findExpected()
+    await user.clear(field)
+    await user.type(field, 'abc{Enter}')
+    const summary = await findSummary()
+    await summary.findByRole('alert')
+
+    await user.click(field)
+    await user.keyboard('{Escape}')
+    expect(field).toHaveValue(text)
+    expect(summary.queryByRole('alert')).not.toBeInTheDocument()
+    expect(field.getAttribute('aria-invalid') ?? 'false').toBe('false')
+    expect(field).not.toHaveClass('invalid')
+
+    await user.tab()
+
+    expect(field).toHaveValue(text)
+    expect(summary.queryByRole('alert')).not.toBeInTheDocument()
+    expect(await contracts.expectedFor(contract!, '2026-11-23')).toBe(stored)
+  })
+})
+
+test('Escape in the Expected field restores the text saved since it was shown', async () => {
+  const { user, contracts, contract } = await renderPage({
+    contract: weekly,
+    expected: { '2026-11-23': 32 * 60 },
+  })
+
+  const field = await findExpected()
+  await user.clear(field)
+  await user.type(field, '30')
+  await user.tab()
+  await waitFor(() => expect(field).toHaveValue('30:00'))
+
+  await user.clear(field)
+  await user.type(field, '20')
+  await user.keyboard('{Escape}')
+  expect(field).toHaveValue('30:00')
+  await user.tab()
+
+  expect(field).toHaveValue('30:00')
+  expect(await contracts.expectedFor(contract!, '2026-11-23')).toBe(30 * 60)
 })
 
 test('keeps the saved Expected value when returning before the other week has loaded', async () => {
