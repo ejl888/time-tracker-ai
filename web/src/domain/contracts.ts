@@ -18,6 +18,7 @@ export type ContractError =
   | 'contract-locked'
   | 'negative'
   | 'not-a-period-start'
+  | 'before-contract-start'
   | 'invalid-start-date'
 
 /** Fields that cannot change once expected hours exist for the contract. */
@@ -49,6 +50,14 @@ export function billedMinutes(
   expected: number | undefined,
 ): number {
   return Math.min(limit, expected ?? 0)
+}
+
+/** Whether the contract covers the period: the period that holds the start is the first. */
+export function coversPeriod(
+  contract: Pick<Contract, 'startDate' | 'billingCycle'>,
+  period: Period,
+): boolean {
+  return Temporal.PlainDate.compare(period.end, contract.startDate) >= 0
 }
 
 /** Whether the text is an existing date written as YYYY-MM-DD. */
@@ -213,6 +222,13 @@ export function createContractService(
       }
       if (!isPeriodStart(periodStart, contract.billingCycle)) {
         return { ok: false, error: 'not-a-period-start' }
+      }
+      const period = periodOf(
+        Temporal.PlainDate.from(periodStart),
+        contract.billingCycle,
+      )
+      if (!coversPeriod(contract, period)) {
+        return { ok: false, error: 'before-contract-start' }
       }
       const existing = await findExpected(contract, periodStart)
       const value = existing

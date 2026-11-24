@@ -2,7 +2,7 @@ import { useEffect, useId, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { Temporal } from 'temporal-polyfill'
 import type { ContractService, Period } from '../domain/contracts.ts'
-import { periodOf } from '../domain/contracts.ts'
+import { coversPeriod, periodOf } from '../domain/contracts.ts'
 import type { Contract } from '../domain/records.ts'
 import { formatMinutes, parseHours } from '../domain/timeText.ts'
 import {
@@ -34,11 +34,6 @@ async function loadSummary(
   const { start } = periodOf(date, contract.billingCycle)
   const expected = await contracts.expectedFor(contract, start.toString())
   return { date, contract, expected }
-}
-
-/** Whether the date is before the contract start. */
-function isBeforeStart(date: Temporal.PlainDate, contract: Contract): boolean {
-  return Temporal.PlainDate.compare(date, contract.startDate) < 0
 }
 
 /** The summary bar above the day: the period of the day and its expected billable hours. */
@@ -79,10 +74,10 @@ function SummaryContent({
   loaded: Loaded
 }) {
   if (!contract) return <p className="hint">{NO_CONTRACT_MESSAGE}</p>
-  if (isBeforeStart(date, contract)) {
+  const period = periodOf(date, contract.billingCycle)
+  if (!coversPeriod(contract, period)) {
     return <p className="hint">{BEFORE_CONTRACT_MESSAGE}</p>
   }
-  const period = periodOf(date, contract.billingCycle)
   const { title, sub } = periodTitle(period, contract.billingCycle)
   return (
     <>

@@ -18,6 +18,8 @@ export function contractErrorMessage(error: ContractError): string {
       return 'Hours cannot be negative'
     case 'not-a-period-start':
       return 'Expected hours belong to the first day of a period'
+    case 'before-contract-start':
+      return 'This period is before your contract starts'
     case 'invalid-start-date':
       return 'Enter a start date'
   }
