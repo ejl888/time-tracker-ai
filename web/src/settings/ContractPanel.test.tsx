@@ -272,3 +272,16 @@ test('still saves the starting balance of a locked contract', async () => {
   )
   expect(balanceField()).toHaveValue('-2:00')
 })
+
+test('asks for a start date when Contract start is cleared and stores nothing', async () => {
+  const { user, contracts } = await renderPanel()
+
+  await user.clear(startField())
+  await user.click(saveButton())
+
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Enter a start date',
+  )
+  expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  expect(await contracts.current()).toBeUndefined()
+})

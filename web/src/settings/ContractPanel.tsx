@@ -64,7 +64,6 @@ function fieldsOf(draft: Draft): ContractFields | string {
   if (billableLimit === undefined || startingBalance === undefined) {
     return INVALID_HOURS_MESSAGE
   }
-  if (!draft.start) return 'Enter a start date'
   return {
     billingCycle: draft.cycle,
     billableLimit,

@@ -199,6 +199,25 @@ describe('contract service', () => {
     expect(onFirst.ok).toBe(true)
   })
 
+  test.each(['', 'x', '2026-02-30', '25-11-2026'])(
+    'a contract start of "%s" is rejected',
+    async (startDate) => {
+      const result = await service.save({ ...fields, startDate })
+
+      expect(result).toEqual({ ok: false, error: 'invalid-start-date' })
+      expect(await service.current()).toBeUndefined()
+    },
+  )
+
+  test('an invalid contract start is rejected when updating', async () => {
+    await createContract()
+
+    const result = await service.save({ ...fields, startDate: '' })
+
+    expect(result).toEqual({ ok: false, error: 'invalid-start-date' })
+    expect((await service.current())?.startDate).toBe('2026-10-05')
+  })
+
   test('clearing expected hours soft-deletes the record', async () => {
     const contract = await lockedContract()
 
