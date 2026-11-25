@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { useLayoutEffect, useRef } from 'react'
 import type { Temporal } from 'temporal-polyfill'
 import type { BillingCycle, Period } from '../domain/contracts.ts'
@@ -6,7 +7,10 @@ import { canGoBack, canGoForward, shiftPeriod } from '../domain/overview.ts'
 import { periodTitle } from './summaryMessages.ts'
 
 interface PeriodBarProps {
-  period: Period
+  /** Goes to the other screens on a phone. */
+  menu?: ReactNode
+  /** Undefined while loading: the bar then holds only the menu. */
+  period: Period | undefined
   cycle: BillingCycle
   /** The first period to go back to; undefined while loading. */
   first: Period | undefined
@@ -16,6 +20,7 @@ interface PeriodBarProps {
 
 /** Names the period shown, with buttons to go to other periods. */
 export function PeriodBar({
+  menu,
   period,
   cycle,
   first,
@@ -23,47 +28,53 @@ export function PeriodBar({
   onGoTo,
 }: PeriodBarProps) {
   const { previousRef, titleRef, nextRef, focusHandlers } = useKeptFocus()
-  const { title, sub } = periodTitle(period, cycle)
+  const text = period && periodTitle(period, cycle)
+  if (!menu && !period) return null
 
   return (
     <div className="period-bar" {...focusHandlers}>
-      <button
-        ref={previousRef}
-        className="icon-btn"
-        type="button"
-        aria-label={`Previous ${cycle}`}
-        disabled={!first || !canGoBack(period, first)}
-        onClick={() => onGoTo(shiftPeriod(period, cycle, -1))}
-      >
-        ‹
-      </button>
-      <div className="ptitle">
-        <h2 ref={titleRef} className="period-title" tabIndex={-1}>
-          {title}
-        </h2>
-        <span className="period-sub">{sub}</span>
-      </div>
-      <button
-        ref={nextRef}
-        className="icon-btn"
-        type="button"
-        aria-label={`Next ${cycle}`}
-        disabled={!canGoForward(period, today)}
-        onClick={() => onGoTo(shiftPeriod(period, cycle, 1))}
-      >
-        ›
-      </button>
-      <span className="spacer" />
-      {!isWithin(today, period) && (
-        <button
-          className="icon-btn"
-          type="button"
-          aria-label="Go to today"
-          title="Go to today"
-          onClick={() => onGoTo(periodOf(today, cycle))}
-        >
-          <TodayIcon />
-        </button>
+      {menu}
+      {period && text && (
+        <>
+          <button
+            ref={previousRef}
+            className="icon-btn"
+            type="button"
+            aria-label={`Previous ${cycle}`}
+            disabled={!first || !canGoBack(period, first)}
+            onClick={() => onGoTo(shiftPeriod(period, cycle, -1))}
+          >
+            ‹
+          </button>
+          <div className="ptitle">
+            <h2 ref={titleRef} className="period-title" tabIndex={-1}>
+              {text.title}
+            </h2>
+            <span className="period-sub">{text.sub}</span>
+          </div>
+          <button
+            ref={nextRef}
+            className="icon-btn"
+            type="button"
+            aria-label={`Next ${cycle}`}
+            disabled={!canGoForward(period, today)}
+            onClick={() => onGoTo(shiftPeriod(period, cycle, 1))}
+          >
+            ›
+          </button>
+          <span className="spacer" />
+          {!isWithin(today, period) && (
+            <button
+              className="icon-btn"
+              type="button"
+              aria-label="Go to today"
+              title="Go to today"
+              onClick={() => onGoTo(periodOf(today, cycle))}
+            >
+              <TodayIcon />
+            </button>
+          )}
+        </>
       )}
     </div>
   )
@@ -92,7 +103,8 @@ function useKeptFocus() {
 
   const focusHandlers = {
     onFocus(event: { target: Element }) {
-      focused.current = event.target
+      // The menu's own buttons stay enabled and in place.
+      focused.current = event.target.closest('.menu-wrap') ? null : event.target
     },
     onBlur() {
       focused.current = null

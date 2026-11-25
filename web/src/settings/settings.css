@@ -1,4 +1,17 @@
 /* Settings screen, from the Settings view in docs/prototype/index.html. */
+/* Phones only: the menu and the title. */
+.settings-bar {
+  display: none;
+}
+@media (max-width: 560px), (max-height: 480px) {
+  .settings-bar {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+  }
+}
+
 .panel {
   background: var(--surface);
   border: 1px solid var(--line);

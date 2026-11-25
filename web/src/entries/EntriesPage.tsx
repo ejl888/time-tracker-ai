@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { Clock } from '../domain/clock.ts'
 import type { ContractService } from '../domain/contracts.ts'
 import { periodOf } from '../domain/contracts.ts'
@@ -30,6 +31,8 @@ interface EntriesPageProps {
   contracts: ContractService
   clock: Clock
   timeZone: string
+  /** Goes to the other screens on a phone. */
+  menu?: ReactNode
 }
 
 /** The days of the billing period with one open, today by default, and a bar to go to other periods. */
@@ -39,6 +42,7 @@ export function EntriesPage({
   contracts,
   clock,
   timeZone,
+  menu,
 }: EntriesPageProps) {
   const today = todayIn(clock.now(), timeZone)
   const { view, goTo, open, edit, cancelEdit, edited, added } = useView(today)
@@ -56,15 +60,14 @@ export function EntriesPage({
 
   return (
     <section className="entries-page">
-      {period && (
-        <PeriodBar
-          period={period}
-          cycle={cycle}
-          first={first}
-          today={today}
-          onGoTo={(other) => goTo(openDay(other, today))}
-        />
-      )}
+      <PeriodBar
+        menu={menu}
+        period={period}
+        cycle={cycle}
+        first={first}
+        today={today}
+        onGoTo={(other) => goTo(openDay(other, today))}
+      />
       <PeriodSummary
         contracts={contracts}
         entries={entries}

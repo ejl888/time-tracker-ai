@@ -1,0 +1,38 @@
+/* The menu on phones, from docs/prototype/index.html. */
+.menu-wrap {
+  position: relative;
+  display: none;
+}
+.menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 30;
+  min-width: 170px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+}
+.menu[hidden] {
+  display: none;
+}
+.menu button {
+  border: 0;
+  background: none;
+  text-align: left;
+  padding: 9px 12px;
+  border-radius: 6px;
+}
+.menu button[aria-current='page'] {
+  background: var(--accent-soft);
+  font-weight: 600;
+}
+@media (max-width: 560px), (max-height: 480px) {
+  .menu-wrap {
+    display: block;
+  }
+}
