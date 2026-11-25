@@ -3,6 +3,7 @@ import { formatLongDate, formatShortDate } from './dateText.ts'
 import type { Day } from './day.ts'
 import { workedText } from './day.ts'
 import { DayHead } from './DayHead.tsx'
+import { Timeline } from './Timeline.tsx'
 
 interface CollapsedDayProps {
   day: Day
@@ -38,6 +39,7 @@ export function CollapsedDay({ day, isToday, onOpen }: CollapsedDayProps) {
         total={totalText(day)}
         overlaps={overlaps(day.entries)}
       />
+      <Timeline day={day} />
     </section>
   )
 }

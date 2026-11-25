@@ -4,6 +4,7 @@
   flex-direction: column;
   gap: 12px;
 }
+
 /* Not in the prototype: keeps the "Entries" heading visible as a caption. */
 .page-title {
   font-family: var(--font-display);
@@ -94,6 +95,38 @@
   color: var(--muted);
   font-size: 13px;
   margin: 0;
+}
+
+.timeline {
+  position: relative;
+  height: 10px;
+  background: var(--bg);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.timeline span {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--accent);
+  border-right: 1px solid var(--surface);
+}
+.timeline span.nb {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--nonbill) 0 3px,
+    transparent 3px 6px
+  );
+}
+.day.collapsed .timeline {
+  height: 6px;
+}
+.tl-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: -6px;
 }
 
 .entries {

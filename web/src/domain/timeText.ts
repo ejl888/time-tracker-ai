@@ -3,6 +3,16 @@ import { Temporal } from 'temporal-polyfill'
 /** 00:00; as an end time it means the end of the day (24:00). */
 export const MIDNIGHT = new Temporal.PlainTime()
 
+/** Minutes since the start of the day of a wall-clock time. */
+export function minutesOf(time: Temporal.PlainTime): number {
+  return time.hour * 60 + time.minute
+}
+
+/** Minutes since the start of the day of a wall-clock end time; an end of 00:00 is 24:00. */
+export function endMinutesOf(end: Temporal.PlainTime): number {
+  return end.equals(MIDNIGHT) ? 24 * 60 : minutesOf(end)
+}
+
 const TIME_PATTERN = /^(\d{1,2}):(\d{2})$/
 
 /** Parses `H:MM` or `HH:MM` (00:00–23:59); `undefined` if the text is not a valid time. */
@@ -22,13 +32,12 @@ export function parseEndTime(text: string): Temporal.PlainTime | undefined {
 
 /** Formats a time as `HH:MM`, without seconds. */
 export function formatTime(time: Temporal.PlainTime): string {
-  const pad = (value: number) => String(value).padStart(2, '0')
-  return `${pad(time.hour)}:${pad(time.minute)}`
+  return formatMinuteOfDay(minutesOf(time))
 }
 
 /** Like `formatTime`, but shows 00:00 as 24:00, the end of the day. */
 export function formatEndTime(time: Temporal.PlainTime): string {
-  return time.equals(MIDNIGHT) ? '24:00' : formatTime(time)
+  return formatMinuteOfDay(endMinutesOf(time))
 }
 
 /** Minutes as H:MM, e.g. 60 as "1:00" and 9000 as "150:00". */
@@ -36,6 +45,11 @@ export function formatMinutes(minutes: number): string {
   const hours = Math.floor(minutes / 60)
   const rest = minutes % 60
   return `${hours}:${String(rest).padStart(2, '0')}`
+}
+
+/** Minutes since the start of the day as HH:MM, e.g. 420 as "07:00" and 1440 as "24:00". */
+export function formatMinuteOfDay(minutes: number): string {
+  return formatMinutes(minutes).padStart(5, '0')
 }
 
 /** Minutes with a sign, e.g. 300 as "+5:00", -30 as "-0:30" and 0 as "0:00". */
