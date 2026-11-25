@@ -419,3 +419,127 @@ test('there are no entries until a date before the first one', async () => {
 
   expect(await service.until(date.subtract({ days: 1 }))).toEqual([])
 })
+
+/** The descriptions of the entries between two dates, in the order returned. */
+async function descriptionsBetween(
+  start: Temporal.PlainDate,
+  end: Temporal.PlainDate,
+): Promise<string[]> {
+  const found = await service.between(start, end)
+  return found.map((entry) => entry.description)
+}
+
+test('the entries between two dates include both dates, sorted by start', async () => {
+  const days = [3, 0, 4, 1, 2]
+  for (const n of days) {
+    await added({ date: date.subtract({ days: n }), description: `${n} ago` })
+  }
+  await added({
+    date: date.subtract({ days: 1 }),
+    start: time('08:00'),
+    end: time('09:00'),
+    description: '1 ago, early',
+  })
+
+  expect(
+    await descriptionsBetween(
+      date.subtract({ days: 3 }),
+      date.subtract({ days: 1 }),
+    ),
+  ).toEqual(['3 ago', '2 ago', '1 ago, early', '1 ago'])
+})
+
+test('the entries between a date and itself are those of that date', async () => {
+  await added({ date: date.subtract({ days: 1 }), description: 'day before' })
+  await added()
+
+  expect(await descriptionsBetween(date, date)).toEqual(['Work'])
+})
+
+test('the entries between two dates leave out deleted entries', async () => {
+  const removed = await added({ description: 'deleted' })
+  await added({ start: time('11:00'), end: time('12:00') })
+  await service.remove(removed.id)
+
+  expect(await descriptionsBetween(date, date)).toEqual(['Work'])
+})
+
+test('the entries between two dates go by the local date in their own time zone and sort by instant', async () => {
+  // 03:00 UTC on 19 November.
+  await added({
+    start: time('22:00'),
+    end: time('23:00'),
+    timeZone: 'America/New_York',
+    description: 'New York, the 18th',
+  })
+  // 19:00 UTC on 18 November.
+  const next = date.add({ days: 1 })
+  await added({
+    date: next,
+    start: time('08:00'),
+    end: time('09:00'),
+    timeZone: 'Pacific/Auckland',
+    description: 'Auckland, the 19th',
+  })
+
+  expect(await descriptionsBetween(date, date)).toEqual(['New York, the 18th'])
+  expect(await descriptionsBetween(next, next)).toEqual(['Auckland, the 19th'])
+  expect(await descriptionsBetween(date, next)).toEqual([
+    'Auckland, the 19th',
+    'New York, the 18th',
+  ])
+})
+
+test('there are no entries between dates without entries', async () => {
+  expect(await service.between(date, date)).toEqual([])
+
+  await added()
+
+  const before = date.subtract({ days: 1 })
+  expect(await service.between(before, before)).toEqual([])
+})
+
+test('the first date is the date of the earliest entry', async () => {
+  await added()
+  await added({ date: date.subtract({ months: 2 }) })
+  await added({ date: date.subtract({ days: 1 }) })
+
+  expect((await service.firstDate())?.toString()).toBe('2026-09-18')
+})
+
+test('the first date leaves out deleted entries', async () => {
+  const removed = await added({ date: date.subtract({ days: 1 }) })
+  await added()
+  await service.remove(removed.id)
+
+  expect((await service.firstDate())?.toString()).toBe('2026-11-18')
+})
+
+test('the first date is the earliest local date, not the date of the earliest start', async () => {
+  // 03:00 UTC on 19 November.
+  await added({
+    start: time('22:00'),
+    end: time('23:00'),
+    timeZone: 'America/New_York',
+  })
+  // 19:00 UTC on 18 November.
+  await added({
+    date: date.add({ days: 1 }),
+    start: time('08:00'),
+    end: time('09:00'),
+    timeZone: 'Pacific/Auckland',
+  })
+
+  expect((await service.firstDate())?.toString()).toBe('2026-11-18')
+})
+
+test('there is no first date without entries', async () => {
+  expect(await service.firstDate()).toBeUndefined()
+})
+
+test('there is no first date when all entries are deleted', async () => {
+  const removed = await added()
+  await service.remove(removed.id)
+
+  expect(await service.firstDate()).toBeUndefined()
+})

@@ -1,5 +1,5 @@
 import { Temporal } from 'temporal-polyfill'
-import { billedMinutes } from './contracts.ts'
+import { billedMinutes, isWithin } from './contracts.ts'
 import type { Period } from './contracts.ts'
 import { dateOf, durationOf } from './entries.ts'
 import type { Contract, Entry, ExpectedHours, Label } from './records.ts'
@@ -9,17 +9,6 @@ import { billableLabelIds } from './workedHours.ts'
 export interface WorkedMinutes {
   billable: number
   nonBillable: number
-}
-
-/** Whether the date is from the start up to and including the end. */
-function isWithin(
-  date: Temporal.PlainDate,
-  { start, end }: Pick<Period, 'start' | 'end'>,
-): boolean {
-  return (
-    Temporal.PlainDate.compare(date, start) >= 0 &&
-    Temporal.PlainDate.compare(date, end) <= 0
-  )
 }
 
 /** The total duration of the entries in whole minutes. */

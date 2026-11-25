@@ -1,5 +1,6 @@
 import { Temporal } from 'temporal-polyfill'
 import type { Clock } from './clock.ts'
+import { isWithin } from './contracts.ts'
 import type { Entry } from './records.ts'
 import type { Repository } from './repository.ts'
 import type { Result } from './result.ts'
@@ -325,14 +326,17 @@ function earliestStartOn(
   )
 }
 
+/** The dates of the entries that are not deleted. */
+function activeDates(entries: Entry[]): Temporal.PlainDate[] {
+  return entries.filter((entry) => !entry.deleted).map(dateOf)
+}
+
 /** The most recent date before the date with entries that are not deleted, or undefined. */
 function latestDateBefore(
   date: Temporal.PlainDate,
   entries: Entry[],
 ): Temporal.PlainDate | undefined {
-  return entries
-    .filter((entry) => !entry.deleted)
-    .map(dateOf)
+  return activeDates(entries)
     .filter((day) => Temporal.PlainDate.compare(day, date) < 0)
     .sort(Temporal.PlainDate.compare)
     .at(-1)
@@ -403,6 +407,25 @@ export function createEntryService(entries: Repository<Entry>, clock: Clock) {
           !entry.deleted &&
           Temporal.PlainDate.compare(dateOf(entry), date) <= 0,
       )
+    },
+
+    /** Entries that are not deleted from the start up to and including the end date, sorted by start. */
+    async between(
+      start: Temporal.PlainDate,
+      end: Temporal.PlainDate,
+    ): Promise<Entry[]> {
+      const all = await entries.all()
+      return all
+        .filter(
+          (entry) => !entry.deleted && isWithin(dateOf(entry), { start, end }),
+        )
+        .sort(byStart)
+    },
+
+    /** The earliest date with entries that are not deleted, or undefined without entries. */
+    async firstDate(): Promise<Temporal.PlainDate | undefined> {
+      const all = await entries.all()
+      return activeDates(all).sort(Temporal.PlainDate.compare).at(0)
     },
 
     /** The times a new entry on the date is prefilled with; see `prefillFor`. */

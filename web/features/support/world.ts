@@ -4,7 +4,11 @@ import { Temporal } from 'temporal-polyfill'
 import { fixedClock } from '../../src/domain/clock.ts'
 import type { Clock } from '../../src/domain/clock.ts'
 import { createContractService } from '../../src/domain/contracts.ts'
-import type { ContractFields } from '../../src/domain/contracts.ts'
+import type {
+  BillingCycle,
+  ContractFields,
+  Period,
+} from '../../src/domain/contracts.ts'
 import { createEntryService } from '../../src/domain/entries.ts'
 import type { ClockChangeNote, Prefill } from '../../src/domain/entries.ts'
 import { createLabelService } from '../../src/domain/labels.ts'
@@ -26,6 +30,14 @@ const TIME_OF_DAY = Temporal.PlainTime.from('12:00')
 
 type EntryService = ReturnType<typeof createEntryService>
 type ContractService = ReturnType<typeof createContractService>
+
+/** The overview as opened: the period shown, the first period it can go back to, its cycle and today. */
+export interface OpenOverview {
+  period: Period
+  first: Period
+  cycle: BillingCycle
+  today: Temporal.PlainDate
+}
 
 /** Name of the hidden billable label for entries in a table without a label column. */
 export const TEST_LABEL = 'Test'
@@ -50,6 +62,8 @@ export class TimetrackerWorld extends World {
   prefill: Prefill | undefined
   /** The clock-change notes for the times of the last entry entered, which is not saved. */
   clockChangeNotes: ClockChangeNote[] | undefined
+  /** The overview, once it is opened. */
+  overview: OpenOverview | undefined
   private hasTestLabel = false
 
   constructor(options: IWorldOptions) {
