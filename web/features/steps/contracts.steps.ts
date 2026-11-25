@@ -73,9 +73,13 @@ async function changeContract(
 
 Given(
   /^a contract starting on (\d{4}-\d{2}-\d{2}) with a (weekly|monthly) billing cycle$/,
-  async function (this: TimetrackerWorld, date: string, cycle: string) {
+  async function (
+    this: TimetrackerWorld,
+    date: Temporal.PlainDate,
+    cycle: string,
+  ) {
     await giveContractFields(this, {
-      startDate: date,
+      startDate: date.toString(),
       billingCycle: CYCLES[cycle],
     })
   },
@@ -108,11 +112,15 @@ Given(
 
 When(
   /^I enter ([+-]?\d+:\d{2}) as the expected billable hours for the week of (\d{4}-\d{2}-\d{2})$/,
-  async function (this: TimetrackerWorld, expected: string, week: string) {
+  async function (
+    this: TimetrackerWorld,
+    expected: string,
+    week: Temporal.PlainDate,
+  ) {
     const contract = await currentContract(this)
     this.lastResult = await this.contractService.setExpected(
       contract,
-      week,
+      week.toString(),
       minutes(expected),
     )
   },
