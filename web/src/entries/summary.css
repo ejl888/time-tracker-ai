@@ -1,7 +1,11 @@
-/* Period summary, from the summary strip of the Log view in docs/prototype/index.html. */
+/*
+ * Period summary, from the summary strip of the Log view in docs/prototype/index.html.
+ * The columns are fixed instead of auto-fit: the full-width title row keeps auto-fit from
+ * collapsing empty columns, so a wide screen would get 6 columns for the 4 metrics.
+ */
 .summary {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -54,9 +58,21 @@
   letter-spacing: 0.06em;
   color: var(--muted);
 }
+.metric .v {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 24px;
+  font-weight: 500;
+}
 .metric .n {
   font-size: 12px;
   color: var(--muted);
+}
+.metric .v.pos {
+  color: var(--good);
+}
+.metric .v.neg {
+  color: var(--bad);
 }
 /* The prototype marks the input with .invalid and replaces the note; the app shows the error as the note. */
 .metric .n.err {
@@ -78,13 +94,23 @@
   border-color: var(--bad);
 }
 
-/* Phones: the period name and its dates on one line. */
+/* Two by two when four columns of 150px (the prototype's minimum) don't fit: 4 x 150 + 32 page padding + 2 border. */
+@media (max-width: 633px) {
+  .summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Phones: smaller values, and the period name and its dates on one line. */
 @media (max-width: 560px) {
   .summary .ptitle {
     flex-direction: row;
     align-items: baseline;
     flex-wrap: wrap;
     column-gap: 6px;
+  }
+  .metric .v {
+    font-size: 20px;
   }
   .period-name {
     font-size: 15px;
