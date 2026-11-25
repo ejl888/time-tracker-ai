@@ -1017,7 +1017,7 @@ test('leaves the add row empty on a day whose latest entry ends at 24:00', async
   await expectAddTimes('', '')
 })
 
-test('prefills the add row for the day shown after going to the previous day', async () => {
+test('prefills the add row for the day shown after opening the previous day', async () => {
   const { user } = await renderPage(workLabels, [
     { date: '2026-11-17', start: '08:00', end: '09:00', label: 'Client' },
   ])
