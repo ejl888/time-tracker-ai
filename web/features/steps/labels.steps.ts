@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { Given, Then, When } from '@cucumber/cucumber'
+import type { DataTable } from '@cucumber/cucumber'
 import type { TimetrackerWorld } from '../support/world.ts'
 
 Given(
@@ -7,6 +8,19 @@ Given(
   async function (this: TimetrackerWorld, name: string) {
     const result = await this.labelService.create(name, { billable: true })
     assert.ok(result.ok, `could not create label ${name}`)
+  },
+)
+
+Given(
+  'these labels:',
+  async function (this: TimetrackerWorld, table: DataTable) {
+    for (const { label, billable } of table.hashes()) {
+      assert.match(billable, /^(yes|no)$/, `billable of ${label}`)
+      const result = await this.labelService.create(label, {
+        billable: billable === 'yes',
+      })
+      assert.ok(result.ok, `could not create label ${label}`)
+    }
   },
 )
 
