@@ -168,7 +168,9 @@ _Priority: **Must** (first version), **Should** (soon after), **Could** (later).
   empty). Other days show one line: date, worked hours, number of entries, overlap warning, and a small timeline.
 - The timeline follows the clock times; durations stay the real ones on days the clock changes.
 - Phone: the header is a menu icon (Overview, Settings), the period with ‹ › arrows and a today button, and one row of
-  totals: balance in, expected, worked, left. Swiping left/right changes the period.
+  totals: balance in, expected, worked, left. The totals have no explanations, except an error or that the expected
+  hours are capped. A low screen (a phone on its side) uses this layout too. Swiping left/right changes the period.
+- Going to another period scrolls to the top.
 - Laptop: the app title and tabs are shown, and the totals include a short explanation each.
 
 #### Contracts
