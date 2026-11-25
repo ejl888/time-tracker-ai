@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import type { Clock } from '../domain/clock.ts'
-import type { ContractService } from '../domain/contracts.ts'
+import type { ContractService, Period } from '../domain/contracts.ts'
 import { periodOf } from '../domain/contracts.ts'
 import type { EntryService } from '../domain/entries.ts'
 import { todayIn } from '../domain/entries.ts'
@@ -23,6 +23,7 @@ import {
   usePrefill,
 } from './useOverview.ts'
 import { editorOf, focusesAddRow, useView } from './useView.ts'
+import { scrollToTop } from '../scrollToTop.ts'
 import '../sticky.css'
 import './entries.css'
 
@@ -59,6 +60,11 @@ export function EntriesPage({
   const loaded = usePeriodEntries(entries, labels, period, revision)
   const prefill = usePrefill(entries, date, revision)
 
+  function goToPeriod(other: Period) {
+    goTo(openDay(other, today))
+    scrollToTop()
+  }
+
   return (
     <section className="entries-page">
       <div className="sticky-top">
@@ -68,7 +74,7 @@ export function EntriesPage({
           cycle={cycle}
           first={first}
           today={today}
-          onGoTo={(other) => goTo(openDay(other, today))}
+          onGoTo={goToPeriod}
         />
         <PeriodSummary
           contracts={contracts}
