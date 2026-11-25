@@ -7,37 +7,18 @@ import type {
   ContractFields,
 } from '../../src/domain/contracts.ts'
 import type { Contract } from '../../src/domain/records.ts'
+import { formatMinutes } from '../../src/domain/timeText.ts'
 import {
-  formatMinutes,
-  parseHours,
-  parseSignedHours,
-} from '../../src/domain/timeText.ts'
+  currentContract,
+  expectToBill,
+  minutes,
+  unsignedMinutes,
+} from '../support/contracts.ts'
 import type { TimetrackerWorld } from '../support/world.ts'
 
 const CYCLES: Record<string, BillingCycle> = {
   weekly: 'week',
   monthly: 'month',
-}
-
-/** Minutes of a duration such as 36:00; fails the step if the text is not one. */
-function minutes(text: string): number {
-  const value = parseSignedHours(text)
-  assert.ok(value !== undefined, `not a duration: ${text}`)
-  return value
-}
-
-/** Minutes of an unsigned duration such as 36:00. */
-function unsignedMinutes(text: string): number {
-  const value = parseHours(text)
-  assert.ok(value !== undefined, `not a duration: ${text}`)
-  return value
-}
-
-/** The current contract; fails the step if there is none. */
-async function currentContract(world: TimetrackerWorld): Promise<Contract> {
-  const contract = await world.contractService.current()
-  assert.ok(contract, 'there is no contract')
-  return contract
 }
 
 /** The fields of a saved contract, to change one of them. */
@@ -121,16 +102,7 @@ Given(
     expected: string,
     week: Temporal.PlainDate,
   ) {
-    const contract = await currentContract(this)
-    const result = await this.contractService.setExpected(
-      contract,
-      week.toString(),
-      unsignedMinutes(expected),
-    )
-    assert.ok(
-      result.ok,
-      `could not set expected hours: ${JSON.stringify(result)}`,
-    )
+    await expectToBill(this, week, unsignedMinutes(expected))
   },
 )
 

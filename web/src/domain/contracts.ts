@@ -113,7 +113,7 @@ export function createContractService(
   }
 
   /** The active expected hours of the contract. */
-  async function activeExpected(contract: Contract): Promise<ExpectedHours[]> {
+  async function expectedRecords(contract: Contract): Promise<ExpectedHours[]> {
     const all = await expectedHours.all()
     return all.filter(
       (record) => !record.deleted && record.contractId === contract.id,
@@ -125,13 +125,13 @@ export function createContractService(
     contract: Contract,
     periodStart: IsoDate,
   ): Promise<ExpectedHours | undefined> {
-    const active = await activeExpected(contract)
+    const active = await expectedRecords(contract)
     return active.find((record) => record.periodStart === periodStart)
   }
 
   /** Whether cycle, start and limit are locked: expected hours exist for the contract. */
   async function isLocked(contract: Contract): Promise<boolean> {
-    return (await activeExpected(contract)).length > 0
+    return (await expectedRecords(contract)).length > 0
   }
 
   /** Updates the contract; cycle, start and limit are locked once expected hours exist. */
@@ -200,6 +200,7 @@ export function createContractService(
   return {
     current,
     isLocked,
+    expectedRecords,
 
     /** Creates the contract or updates the current one. */
     async save(

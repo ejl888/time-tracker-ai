@@ -396,4 +396,36 @@ describe('contract service', () => {
 
     expect(await service.isLocked(contract)).toBe(false)
   })
+
+  test('a contract without expected hours has no expected records', async () => {
+    const contract = await createContract()
+
+    expect(await service.expectedRecords(contract)).toEqual([])
+  })
+
+  test('the expected records are those of every period that are not cleared', async () => {
+    const contract = await createContract()
+    await service.setExpected(contract, '2026-10-05', 2160)
+    await service.setExpected(contract, '2026-10-12', 1920)
+    await service.setExpected(contract, '2026-10-19', 0)
+    await service.setExpected(contract, '2026-10-12', undefined)
+
+    const records = await service.expectedRecords(contract)
+
+    expect(records).toHaveLength(2)
+    expect(records).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ periodStart: '2026-10-05', expected: 2160 }),
+        expect.objectContaining({ periodStart: '2026-10-19', expected: 0 }),
+      ]),
+    )
+  })
+
+  test('the expected records of another contract are left out', async () => {
+    const contract = await lockedContract()
+    const [own] = await expectedHours.all()
+    await expectedHours.save({ ...own, id: 'other', contractId: 'other' })
+
+    expect(await service.expectedRecords(contract)).toEqual([own])
+  })
 })
