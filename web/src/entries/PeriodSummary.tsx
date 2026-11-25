@@ -23,6 +23,7 @@ import {
   balanceInNote,
   balanceInTitle,
   expectedNote,
+  isCapped,
   leftNote,
   workedNote,
 } from './summaryMessages.ts'
@@ -195,6 +196,7 @@ function ExpectedMetric({
   /** Called with the new expected minutes after they were saved. */
   onSaved: (expected: number | undefined) => void
 }) {
+  const { billableLimit, billingCycle } = contract
   const id = useId()
   const [text, setText] = useState(() => textOf(stored))
   const [error, setError] = useState<string>()
@@ -257,12 +259,9 @@ function ExpectedMetric({
           {error}
         </span>
       ) : (
-        <span className="n">
-          {expectedNote(
-            contract.billingCycle,
-            contract.billableLimit,
-            shownValue,
-          )}
+        // On phones only a capped value keeps its note.
+        <span className={isCapped(billableLimit, shownValue) ? 'n keep' : 'n'}>
+          {expectedNote(billingCycle, billableLimit, shownValue)}
         </span>
       )}
     </div>

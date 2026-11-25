@@ -23,6 +23,7 @@ import {
   usePrefill,
 } from './useOverview.ts'
 import { editorOf, focusesAddRow, useView } from './useView.ts'
+import '../sticky.css'
 import './entries.css'
 
 interface EntriesPageProps {
@@ -60,23 +61,25 @@ export function EntriesPage({
 
   return (
     <section className="entries-page">
-      <PeriodBar
-        menu={menu}
-        period={period}
-        cycle={cycle}
-        first={first}
-        today={today}
-        onGoTo={(other) => goTo(openDay(other, today))}
-      />
-      <PeriodSummary
-        contracts={contracts}
-        entries={entries}
-        labels={labels}
-        contract={contract}
-        period={period}
-        today={today}
-        revision={revision}
-      />
+      <div className="sticky-top">
+        <PeriodBar
+          menu={menu}
+          period={period}
+          cycle={cycle}
+          first={first}
+          today={today}
+          onGoTo={(other) => goTo(openDay(other, today))}
+        />
+        <PeriodSummary
+          contracts={contracts}
+          entries={entries}
+          labels={labels}
+          contract={contract}
+          period={period}
+          today={today}
+          revision={revision}
+        />
+      </div>
       {period && loaded && (
         <DayList
           days={daysShown(period, today).map((shown) => dayOf(shown, loaded))}

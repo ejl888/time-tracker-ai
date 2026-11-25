@@ -50,7 +50,11 @@ export function PeriodBar({
             <h2 ref={titleRef} className="period-title" tabIndex={-1}>
               {text.title}
             </h2>
-            <span className="period-sub">{text.sub}</span>
+            {/* The styles show one of the two. */}
+            <span className="period-sub full">{text.sub}</span>
+            {text.short && (
+              <span className="period-sub short">{text.short}</span>
+            )}
           </div>
           <button
             ref={nextRef}
