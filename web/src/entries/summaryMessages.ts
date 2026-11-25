@@ -35,3 +35,19 @@ export function expectedNote(
   if (expected > limit) return `Capped at ${formatMinutes(limit)} by contract`
   return `Limit ${formatMinutes(limit)}`
 }
+
+/** The tooltip of Balance in. */
+export function balanceInTitle(cycle: BillingCycle): string {
+  return `Balance carried in from earlier ${cycle}s`
+}
+
+/** The note under Balance in. */
+export function balanceInNote(cycle: BillingCycle): string {
+  return `From earlier ${cycle}s`
+}
+
+/** The note under Worked: the non-billable minutes that are not in it, if any. */
+export function workedNote(nonBillable: number): string {
+  if (nonBillable === 0) return 'Billable labels only'
+  return `+ ${formatMinutes(nonBillable)} non-billable`
+}

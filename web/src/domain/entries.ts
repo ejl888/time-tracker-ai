@@ -395,6 +395,16 @@ export function createEntryService(entries: Repository<Entry>, clock: Clock) {
       return activeOn(all, date).sort(byStart)
     },
 
+    /** Entries that are not deleted up to and including the date. */
+    async until(date: Temporal.PlainDate): Promise<Entry[]> {
+      const all = await entries.all()
+      return all.filter(
+        (entry) =>
+          !entry.deleted &&
+          Temporal.PlainDate.compare(dateOf(entry), date) <= 0,
+      )
+    },
+
     /** The times a new entry on the date is prefilled with; see `prefillFor`. */
     async prefill(date: Temporal.PlainDate): Promise<Prefill | undefined> {
       return prefillFor(date, await entries.all())

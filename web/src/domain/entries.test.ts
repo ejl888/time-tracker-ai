@@ -360,3 +360,62 @@ test('a start equal to the end in the repeated hour gives one note', () => {
 
   expect(notes).toEqual([{ kind: 'repeated', time: time('02:30') }])
 })
+
+/** The descriptions of the entries up to and including a date, sorted. */
+async function descriptionsUntil(day: Temporal.PlainDate): Promise<string[]> {
+  const found = await service.until(day)
+  return found.map((entry) => entry.description).sort()
+}
+
+test('the entries until a date are those of earlier days and of the date itself', async () => {
+  await added({
+    date: date.subtract({ months: 2 }),
+    description: 'months before',
+  })
+  await added({ date: date.subtract({ days: 1 }), description: 'day before' })
+  await added({ description: 'on the day' })
+
+  expect(await descriptionsUntil(date.subtract({ days: 1 }))).toEqual([
+    'day before',
+    'months before',
+  ])
+  expect(await descriptionsUntil(date)).toEqual([
+    'day before',
+    'months before',
+    'on the day',
+  ])
+})
+
+test('the entries until a date leave out deleted entries', async () => {
+  const removed = await added({ description: 'deleted' })
+  await added({ start: time('11:00'), end: time('12:00') })
+  await service.remove(removed.id)
+
+  expect(await descriptionsUntil(date)).toEqual(['Work'])
+})
+
+test('the entries until a date go by the local date in their own time zone', async () => {
+  // 03:00 UTC on 19 November.
+  await added({
+    start: time('22:00'),
+    end: time('23:00'),
+    timeZone: 'America/New_York',
+    description: 'New York, the 18th',
+  })
+  // 19:00 UTC on 18 November.
+  await added({
+    date: date.add({ days: 1 }),
+    start: time('08:00'),
+    end: time('09:00'),
+    timeZone: 'Pacific/Auckland',
+    description: 'Auckland, the 19th',
+  })
+
+  expect(await descriptionsUntil(date)).toEqual(['New York, the 18th'])
+})
+
+test('there are no entries until a date before the first one', async () => {
+  await added()
+
+  expect(await service.until(date.subtract({ days: 1 }))).toEqual([])
+})

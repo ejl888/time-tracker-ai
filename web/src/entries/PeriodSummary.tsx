@@ -1,99 +1,90 @@
-import { useEffect, useId, useState } from 'react'
+import { useId, useState } from 'react'
 import type { KeyboardEvent } from 'react'
-import { Temporal } from 'temporal-polyfill'
+import type { Temporal } from 'temporal-polyfill'
 import type { ContractService, Period } from '../domain/contracts.ts'
-import { coversPeriod, periodOf } from '../domain/contracts.ts'
+import { coversPeriod } from '../domain/contracts.ts'
 import type { Contract } from '../domain/records.ts'
-import { formatMinutes, parseHours } from '../domain/timeText.ts'
+import {
+  formatMinutes,
+  formatSignedMinutes,
+  parseHours,
+} from '../domain/timeText.ts'
 import {
   INVALID_HOURS_MESSAGE,
   contractErrorMessage,
 } from '../settings/contractMessages.ts'
+import { Metric } from './Metric.tsx'
 import {
   BEFORE_CONTRACT_MESSAGE,
   NO_CONTRACT_MESSAGE,
+  balanceInNote,
+  balanceInTitle,
   expectedNote,
   periodTitle,
+  workedNote,
 } from './summaryMessages.ts'
+import type { LoadedSummary, SummaryServices } from './useSummary.ts'
+import { useSummary } from './useSummary.ts'
 import './summary.css'
 
-/** The expected minutes loaded for the period that starts on `periodStart`. */
-interface LoadedExpected {
-  periodStart: string
-  expected: number | undefined
+interface PeriodSummaryProps extends SummaryServices {
+  date: Temporal.PlainDate
+  /** Raised when entries changed, to load the totals again. */
+  revision: number
 }
 
-/** The summary bar above the day: the period of the day and its expected billable hours. */
+/** The summary bar above the day: the period of the day with its balance, expected and worked hours. */
 export function PeriodSummary({
   contracts,
+  entries,
+  labels,
   date,
-}: {
-  contracts: ContractService
-  date: Temporal.PlainDate
-}) {
-  // The current contract: undefined while loading, null when there is none.
-  const [contract, setContract] = useState<Contract | null>()
-  const [loaded, setLoaded] = useState<LoadedExpected>()
-
-  useEffect(() => {
-    let current = true
-    void contracts.current().then((found) => {
-      if (current) setContract(found ?? null)
-    })
-    return () => {
-      current = false
-    }
-  }, [contracts])
-
-  const period = contract ? periodOf(date, contract.billingCycle) : undefined
-  // Loaded per period start, so moving to another day of the period keeps what is shown.
-  const periodStart = period?.start.toString()
-
-  useEffect(() => {
-    if (!contract || periodStart === undefined) return
-    let current = true
-    void contracts.expectedFor(contract, periodStart).then((expected) => {
-      if (current) setLoaded({ periodStart, expected })
-    })
-    return () => {
-      current = false
-      // Returning to this period loads it again, as its value may have been saved since.
-      setLoaded(undefined)
-    }
-  }, [contract, periodStart, contracts])
-
-  const shown = loaded?.periodStart === periodStart ? loaded : undefined
+  revision,
+}: PeriodSummaryProps) {
+  const { contract, period, loaded } = useSummary(
+    { contracts, entries, labels },
+    date,
+    revision,
+  )
 
   return (
     <section className="summary" aria-label="Period summary">
       {contract === null && <p className="hint">{NO_CONTRACT_MESSAGE}</p>}
-      {contract && period && shown && (
+      {contract && period && loaded && (
         <SummaryContent
           contracts={contracts}
           contract={contract}
           period={period}
-          expected={shown.expected}
+          loaded={loaded}
         />
       )}
     </section>
   )
 }
 
-/** The note before the contract start, else the period with its Expected metric. */
+/** The tone a balance is shown in; none when it is zero. */
+function toneOf(balance: number): 'pos' | 'neg' | undefined {
+  if (balance === 0) return undefined
+  return balance > 0 ? 'pos' : 'neg'
+}
+
+/** The note before the contract start, else the period with its metrics. */
 function SummaryContent({
   contracts,
   contract,
   period,
-  expected,
+  loaded,
 }: {
   contracts: ContractService
   contract: Contract
   period: Period
-  expected: number | undefined
+  loaded: LoadedSummary
 }) {
   if (!coversPeriod(contract, period)) {
     return <p className="hint">{BEFORE_CONTRACT_MESSAGE}</p>
   }
+  const { expected, totals } = loaded
+  const { balanceIn, worked } = totals
   const { title, sub } = periodTitle(period, contract.billingCycle)
   return (
     <>
@@ -101,12 +92,24 @@ function SummaryContent({
         <h2 className="period-name">{title}</h2>
         <span className="period-sub">{sub}</span>
       </div>
+      <Metric
+        name="Balance in"
+        title={balanceInTitle(contract.billingCycle)}
+        value={formatSignedMinutes(balanceIn)}
+        tone={toneOf(balanceIn)}
+        note={balanceInNote(contract.billingCycle)}
+      />
       <ExpectedMetric
         key={period.start.toString()}
         contracts={contracts}
         contract={contract}
         period={period}
         stored={expected}
+      />
+      <Metric
+        name="Worked"
+        value={formatMinutes(worked.billable)}
+        note={workedNote(worked.nonBillable)}
       />
     </>
   )

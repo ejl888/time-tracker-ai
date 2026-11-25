@@ -93,6 +93,8 @@ export function EntriesPage({
   const [editing, setEditing] = useState<string>()
   // The id of the entry whose editor closed last, whose row gets focus again.
   const [closed, setClosed] = useState<string>()
+  // Raised after entries changed, so the summary loads its totals again.
+  const [revision, setRevision] = useState(0)
 
   useEffect(() => {
     let current = true
@@ -104,8 +106,9 @@ export function EntriesPage({
     }
   }, [date, entries, labels])
 
-  /** Loads the shown date again, e.g. after an entry was added, and returns the loaded day. */
+  /** Loads the shown date and the summary again, e.g. after an entry was added, and returns the loaded day. */
   async function reload(): Promise<Day> {
+    setRevision((previous) => previous + 1)
     const loaded = await loadDay(date, entries, labels)
     setDay(loaded)
     return loaded
@@ -162,7 +165,13 @@ export function EntriesPage({
           Today
         </button>
       </div>
-      <PeriodSummary contracts={contracts} date={date} />
+      <PeriodSummary
+        contracts={contracts}
+        entries={entries}
+        labels={labels}
+        date={date}
+        revision={revision}
+      />
       {shown && (
         <div className="day active">
           <DayEntries
