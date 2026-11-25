@@ -57,37 +57,23 @@ async function loadTotals(
 }
 
 /**
- * The contract, the period of the date and its values, once loaded. A raised revision loads the
+ * The values of the period, once loaded. A raised revision loads the
  * totals again, keeping the shown ones until then.
  */
 export function useSummary(
   { contracts, entries, labels }: SummaryServices,
-  date: Temporal.PlainDate,
+  contract: Contract | null | undefined,
+  period: Period | undefined,
   revision: number,
 ): {
-  /** The current contract: undefined while loading, null when there is none. */
-  contract: Contract | null | undefined
-  period: Period | undefined
   /** The values of the period, or undefined until all of them are loaded. */
   loaded: LoadedSummary | undefined
   /** Shows the saved expected minutes of a period; ignored when that period is no longer shown. */
   showExpected: (periodStart: string, expected: number | undefined) => void
 } {
-  const [contract, setContract] = useState<Contract | null>()
   const [loadedExpected, setLoadedExpected] = useState<LoadedExpected>()
   const [loadedTotals, setLoadedTotals] = useState<LoadedTotals>()
 
-  useEffect(() => {
-    let current = true
-    void contracts.current().then((found) => {
-      if (current) setContract(found ?? null)
-    })
-    return () => {
-      current = false
-    }
-  }, [contracts])
-
-  const period = contract ? periodOf(date, contract.billingCycle) : undefined
   // Loaded per period start, so moving to another day of the period keeps what is shown.
   const periodStart = period?.start.toString()
 
@@ -137,5 +123,5 @@ export function useSummary(
     )
   }
 
-  return { contract, period, loaded, showExpected }
+  return { loaded, showExpected }
 }

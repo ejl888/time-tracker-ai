@@ -83,7 +83,7 @@ async function renderPage(
       timeZone={timeZone}
     />,
   )
-  await screen.findByRole('heading', { name: 'Entries' })
+  await screen.findByRole('heading', { level: 3 })
   return { user: userEvent.setup(), entries, labels, ids }
 }
 
@@ -210,10 +210,10 @@ test('shows the worked hours of the day, counting only billable labels', async (
   ])
 
   await findEntries(2)
-  expect(screen.getByText('Worked 1:00')).toBeInTheDocument()
+  expect(screen.getByText('1:00 worked')).toBeInTheDocument()
 })
 
-test('goes to the previous and next day, but not past today', async () => {
+test('opens another day and today again', async () => {
   const { user } = await renderPage(workLabels, [
     {
       date: '2026-11-18',
@@ -231,10 +231,10 @@ test('goes to the previous and next day, but not past today', async () => {
     },
   ])
   await findEntries(1)
-  const next = screen.getByRole('button', { name: 'Next day' })
-  expect(next).toBeDisabled()
 
-  await user.click(screen.getByRole('button', { name: 'Previous day' }))
+  await user.click(
+    screen.getByRole('button', { name: 'Open Tuesday 17 November' }),
+  )
 
   expect(
     await screen.findByRole('heading', { name: 'Tuesday 17 November 2026' }),
@@ -246,17 +246,17 @@ test('goes to the previous and next day, but not past today', async () => {
     label: 'Admin',
     description: 'Yesterday',
   })
-  expect(screen.getByText('Worked 0:00')).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Next day' })).toBeEnabled()
+  expect(screen.getByText('0:00 worked')).toBeInTheDocument()
 
-  await user.click(screen.getByRole('button', { name: 'Next day' }))
+  await user.click(
+    screen.getByRole('button', { name: 'Open Wednesday 18 November' }),
+  )
 
   expect(
     await screen.findByRole('heading', { name: 'Wednesday 18 November 2026' }),
   ).toBeInTheDocument()
   await findEntries(1)
   expect(listedEntries()[0]).toMatchObject({ description: 'Today' })
-  expect(screen.getByRole('button', { name: 'Next day' })).toBeDisabled()
 })
 
 test('returns to today from an earlier day', async () => {
@@ -271,13 +271,16 @@ test('returns to today from an earlier day', async () => {
   ])
   await findEntries(1)
 
-  await user.click(screen.getByRole('button', { name: 'Previous day' }))
-  await user.click(screen.getByRole('button', { name: 'Previous day' }))
+  await user.click(
+    screen.getByRole('button', { name: 'Open Monday 16 November' }),
+  )
   expect(
     await screen.findByRole('heading', { name: 'Monday 16 November 2026' }),
   ).toBeInTheDocument()
 
-  await user.click(screen.getByRole('button', { name: 'Today' }))
+  await user.click(
+    screen.getByRole('button', { name: 'Open Wednesday 18 November' }),
+  )
 
   expect(
     await screen.findByRole('heading', { name: 'Wednesday 18 November 2026' }),
@@ -314,7 +317,7 @@ test('shows "No entries" for a day without entries', async () => {
 
   expect(await screen.findByText('No entries')).toBeInTheDocument()
   expect(listedEntries()).toEqual([])
-  expect(screen.getByText('Worked 0:00')).toBeInTheDocument()
+  expect(screen.getByText('0:00 worked')).toBeInTheDocument()
 })
 
 test('shows an entry ending at midnight as ending at 24:00', async () => {
@@ -384,7 +387,7 @@ test('adds an entry in time order, updates the worked hours and prefills the add
     { date: '2026-11-18', start: '15:00', end: '16:00', label: 'Admin' },
   ])
   await findEntries(2)
-  expect(screen.getByText('Worked 1:00')).toBeInTheDocument()
+  expect(screen.getByText('1:00 worked')).toBeInTheDocument()
   expect(addForm().getByRole('combobox', { name: 'Label' })).toHaveDisplayValue(
     'Pick a label',
   )
@@ -396,7 +399,7 @@ test('adds an entry in time order, updates the worked hours and prefills the add
     description: 'Review',
   })
 
-  expect(await screen.findByText('Worked 2:30')).toBeInTheDocument()
+  expect(await screen.findByText('2:30 worked')).toBeInTheDocument()
   const found = await findEntries(3)
   expect(found.map(({ start, end }) => `${start}-${end}`)).toEqual([
     '09:00-10:00',
@@ -500,7 +503,9 @@ test('accepts 24:00 as the end', async () => {
 test('adds an entry to the day shown', async () => {
   const { user } = await renderPage(workLabels)
   await screen.findByText('No entries')
-  await user.click(screen.getByRole('button', { name: 'Previous day' }))
+  await user.click(
+    screen.getByRole('button', { name: 'Open Tuesday 17 November' }),
+  )
   expect(
     await screen.findByRole('heading', { name: 'Tuesday 17 November 2026' }),
   ).toBeInTheDocument()
@@ -515,7 +520,9 @@ test('adds an entry to the day shown', async () => {
 
   const [entry] = await findEntries(1)
   expect(entry).toMatchObject({ description: 'Yesterday' })
-  await user.click(screen.getByRole('button', { name: 'Next day' }))
+  await user.click(
+    screen.getByRole('button', { name: 'Open Wednesday 18 November' }),
+  )
   expect(
     await screen.findByRole('heading', { name: 'Wednesday 18 November 2026' }),
   ).toBeInTheDocument()
@@ -632,7 +639,7 @@ test('clicking another row closes the first editor and discards its changes', as
     end: '10:00',
     open: false,
   })
-  expect(screen.getByText('Worked 1:00')).toBeInTheDocument()
+  expect(screen.getByText('1:00 worked')).toBeInTheDocument()
   expect(await savedEntries(entries)).toEqual(before)
 })
 
@@ -658,7 +665,7 @@ test('Cancel closes the editor without saving', async () => {
 test("changes an entry's end with Enter and updates its duration and the worked hours", async () => {
   const { user, entries, ids } = await renderPage(workLabels, twoEntries)
   const [first] = await findEntries(2)
-  expect(screen.getByText('Worked 1:00')).toBeInTheDocument()
+  expect(screen.getByText('1:00 worked')).toBeInTheDocument()
   const editor = await openEntry(user, first.item)
   const end = editor.getByRole('textbox', { name: 'End' })
 
@@ -666,7 +673,7 @@ test("changes an entry's end with Enter and updates its duration and the worked 
   await user.type(end, '11:15{Enter}')
 
   expect(await within(first.item).findByText('2:15')).toBeInTheDocument()
-  expect(await screen.findByText('Worked 2:15')).toBeInTheDocument()
+  expect(await screen.findByText('2:15 worked')).toBeInTheDocument()
   expect(editorShown()).toBe(false)
   expect(listedEntries()[0]).toMatchObject({ end: '11:15' })
   expect(await savedEntries(entries)).toEqual([
@@ -686,11 +693,11 @@ test("changes an entry's end with the Save button", async () => {
   await user.type(end, '11:15')
   // Leaving the field no longer saves.
   await user.tab()
-  expect(screen.getByText('Worked 1:00')).toBeInTheDocument()
+  expect(screen.getByText('1:00 worked')).toBeInTheDocument()
   expect(await savedEntries(entries)).toEqual(before)
   await user.click(editor.getByRole('button', { name: 'Save' }))
 
-  expect(await screen.findByText('Worked 2:15')).toBeInTheDocument()
+  expect(await screen.findByText('2:15 worked')).toBeInTheDocument()
   await waitFor(async () =>
     expect((await savedEntries(entries))[0].time).toBe('09:00-11:15'),
   )
@@ -730,7 +737,7 @@ test('Esc closes the editor and saves nothing', async () => {
 
   expect(editorShown()).toBe(false)
   expect(listedEntries()[0]).toMatchObject({ end: '10:00' })
-  expect(screen.getByText('Worked 1:00')).toBeInTheDocument()
+  expect(screen.getByText('1:00 worked')).toBeInTheDocument()
   expect(await savedEntries(entries)).toEqual(before)
   const reopened = await openEntry(user, first.item)
   expect(reopened.getByRole('textbox', { name: 'End' })).toHaveValue('10:00')
@@ -787,7 +794,7 @@ test('a successful save closes the editor and its message', async () => {
   await user.clear(end)
   await user.type(end, '11:15{Enter}')
 
-  expect(await screen.findByText('Worked 2:15')).toBeInTheDocument()
+  expect(await screen.findByText('2:15 worked')).toBeInTheDocument()
   expect(editorShown()).toBe(false)
   expect(screen.queryByRole('alert')).not.toBeInTheDocument()
 })
@@ -795,17 +802,17 @@ test('a successful save closes the editor and its message', async () => {
 test('changes the label on Save', async () => {
   const { user, entries, ids } = await renderPage(workLabels, twoEntries)
   const [first] = await findEntries(2)
-  expect(screen.getByText('Worked 1:00')).toBeInTheDocument()
+  expect(screen.getByText('1:00 worked')).toBeInTheDocument()
   const editor = await openEntry(user, first.item)
 
   await user.selectOptions(
     editor.getByRole('combobox', { name: 'Label' }),
     'Admin',
   )
-  expect(screen.getByText('Worked 1:00')).toBeInTheDocument()
+  expect(screen.getByText('1:00 worked')).toBeInTheDocument()
   await user.click(editor.getByRole('button', { name: 'Save' }))
 
-  expect(await screen.findByText('Worked 0:00')).toBeInTheDocument()
+  expect(await screen.findByText('0:00 worked')).toBeInTheDocument()
   await waitFor(async () =>
     expect((await savedEntries(entries))[0].labelId).toBe(ids.get('Admin')),
   )
@@ -845,7 +852,7 @@ async function deleteEntry(
 test('deletes an entry with two clicks on Delete', async () => {
   const { user, entries } = await renderPage(workLabels, twoEntries)
   const [first] = await findEntries(2)
-  expect(screen.getByText('Worked 1:00')).toBeInTheDocument()
+  expect(screen.getByText('1:00 worked')).toBeInTheDocument()
   const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
 
   await deleteEntry(user, first.item)
@@ -854,7 +861,7 @@ test('deletes an entry with two clicks on Delete', async () => {
   await waitFor(() => expect(listedEntries()).toHaveLength(1))
   expect(editorShown()).toBe(false)
   expect(listedEntries()[0]).toMatchObject({ description: 'Filing' })
-  expect(screen.getByText('Worked 0:00')).toBeInTheDocument()
+  expect(screen.getByText('0:00 worked')).toBeInTheDocument()
   expect(
     (await savedEntries(entries)).map(({ description }) => description),
   ).toEqual(['Filing'])
@@ -874,7 +881,7 @@ test('keeps the entry after one click on Delete and Esc', async () => {
 
   expect(editorShown()).toBe(false)
   expect(listedEntries()).toHaveLength(2)
-  expect(screen.getByText('Worked 1:00')).toBeInTheDocument()
+  expect(screen.getByText('1:00 worked')).toBeInTheDocument()
   expect(await savedEntries(entries)).toEqual(before)
 })
 
@@ -997,7 +1004,7 @@ test('opening an entry hides the empty row; closing it shows the prefill again',
   await user.clear(end)
   await user.type(end, '12:00{Enter}')
 
-  expect(await screen.findByText('Worked 3:00')).toBeInTheDocument()
+  expect(await screen.findByText('3:00 worked')).toBeInTheDocument()
   await expectAddTimes('12:00', '12:00')
 })
 
@@ -1018,7 +1025,9 @@ test('prefills the add row for the day shown after going to the previous day', a
   // Today has no entries, so it takes the earliest start of the day before.
   await expectAddTimes('08:00', '08:00')
 
-  await user.click(screen.getByRole('button', { name: 'Previous day' }))
+  await user.click(
+    screen.getByRole('button', { name: 'Open Tuesday 17 November' }),
+  )
   expect(
     await screen.findByRole('heading', { name: 'Tuesday 17 November 2026' }),
   ).toBeInTheDocument()
@@ -1159,7 +1168,7 @@ test('Cancel resets the add row to its prefill and adds nothing', async () => {
 
   await expectAddRowReset('10:30', '10:30')
   expect(listedEntries()).toHaveLength(1)
-  expect(screen.getByText('Worked 1:30')).toBeInTheDocument()
+  expect(screen.getByText('1:30 worked')).toBeInTheDocument()
 })
 
 test('Esc resets the add row to its prefill and adds nothing', async () => {
@@ -1174,7 +1183,7 @@ test('Esc resets the add row to its prefill and adds nothing', async () => {
 
   await expectAddRowReset('10:30', '10:30')
   expect(listedEntries()).toHaveLength(1)
-  expect(screen.getByText('Worked 1:30')).toBeInTheDocument()
+  expect(screen.getByText('1:30 worked')).toBeInTheDocument()
 })
 
 test('Cancel clears a message in the add row', async () => {
@@ -1288,7 +1297,7 @@ async function renderWithUnknownLabel(
       timeZone={timeZone}
     />,
   )
-  await screen.findByRole('heading', { name: 'Entries' })
+  await screen.findByRole('heading', { level: 3 })
   return { user: userEvent.setup() }
 }
 
@@ -1832,7 +1841,7 @@ async function renderOnDay(date: string, seedEntries: SeedEntry[] = []) {
       timeZone={timeZone}
     />,
   )
-  await screen.findByRole('heading', { name: 'Entries' })
+  await screen.findByRole('heading', { level: 3 })
   return { user: userEvent.setup() }
 }
 
@@ -1973,7 +1982,9 @@ test('going to another day closes an open editor and shows the empty row of that
   let [entry] = await findEntries(1)
   await openEntry(user, entry.item)
 
-  await user.click(screen.getByRole('button', { name: 'Previous day' }))
+  await user.click(
+    screen.getByRole('button', { name: 'Open Tuesday 17 November' }),
+  )
 
   expect(
     await screen.findByRole('heading', { name: 'Tuesday 17 November 2026' }),
@@ -1984,7 +1995,9 @@ test('going to another day closes an open editor and shows the empty row of that
   await expectAddTimes('12:00', '12:00')
 
   await openEntry(user, entry.item)
-  await user.click(screen.getByRole('button', { name: 'Next day' }))
+  await user.click(
+    screen.getByRole('button', { name: 'Open Wednesday 18 November' }),
+  )
 
   expect(
     await screen.findByRole('heading', { name: 'Wednesday 18 November 2026' }),
@@ -1994,13 +2007,17 @@ test('going to another day closes an open editor and shows the empty row of that
   expect(editorShown()).toBe(false)
   await expectAddTimes('10:00', '10:00')
 
-  await user.click(screen.getByRole('button', { name: 'Previous day' }))
+  await user.click(
+    screen.getByRole('button', { name: 'Open Tuesday 17 November' }),
+  )
   expect(
     await screen.findByRole('heading', { name: 'Tuesday 17 November 2026' }),
   ).toBeInTheDocument()
   entry = (await findEntries(1))[0]
   await openEntry(user, entry.item)
-  await user.click(screen.getByRole('button', { name: 'Today' }))
+  await user.click(
+    screen.getByRole('button', { name: 'Open Wednesday 18 November' }),
+  )
 
   expect(
     await screen.findByRole('heading', { name: 'Wednesday 18 November 2026' }),

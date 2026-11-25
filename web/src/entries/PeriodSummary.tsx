@@ -32,27 +32,32 @@ import { useSummary } from './useSummary.ts'
 import './summary.css'
 
 interface PeriodSummaryProps extends SummaryServices {
-  date: Temporal.PlainDate
+  /** The current contract: undefined while loading, null when there is none. */
+  contract: Contract | null | undefined
+  /** The period shown; undefined while the contract is loading. */
+  period: Period | undefined
   today: Temporal.PlainDate
   /** Raised when entries changed, to load the totals again. */
   revision: number
 }
 
 /**
- * The summary bar above the day: the period of the day with its balance, expected and worked hours,
+ * The summary bar above the days: the period with its balance, expected and worked hours,
  * and the hours left or the balance after it.
  */
 export function PeriodSummary({
   contracts,
   entries,
   labels,
-  date,
+  contract,
+  period,
   today,
   revision,
 }: PeriodSummaryProps) {
-  const { contract, period, loaded, showExpected } = useSummary(
+  const { loaded, showExpected } = useSummary(
     { contracts, entries, labels },
-    date,
+    contract,
+    period,
     revision,
   )
 
