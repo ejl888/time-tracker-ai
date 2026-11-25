@@ -13,7 +13,7 @@
   --warn-bg: #fff3dc;
   --bad: #a3262a;
   --good: #1d774a;
-  /* Not used yet; kept for the later menu and autocomplete. */
+  /* Used by the menu; kept for the later autocomplete too. */
   --shadow: 0 10px 40px rgba(22, 32, 43, 0.18);
   --font-display: 'Archivo', 'Helvetica Neue', Arial, sans-serif;
   --font-body:
@@ -114,6 +114,20 @@ header.app {
 .tabs button[aria-pressed='true'] {
   background: var(--accent);
   color: var(--accent-ink);
+}
+/* Phones: the menu replaces the tabs; the title stays for screen readers only. */
+@media (max-width: 560px), (max-height: 480px) {
+  header.app {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .tabs {
+    display: none;
+  }
 }
 
 /* Shared controls */

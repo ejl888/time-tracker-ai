@@ -5,6 +5,7 @@ import App from './App'
 
 beforeEach(() => {
   localStorage.clear()
+  document.documentElement.scrollTop = 0
 })
 
 test('shows the app name as heading', () => {
@@ -239,4 +240,119 @@ test('keeps a saved contract after a reload and stores it under timetracker.cont
       deleted: false,
     }),
   ])
+})
+
+// The menu, for phones
+
+function menuIcon() {
+  return screen.getByRole('button', { name: 'Menu' })
+}
+
+/** Chooses a screen in the menu, with the page scrolled down. */
+async function chooseInMenu(title: string) {
+  const user = userEvent.setup()
+  await user.click(menuIcon())
+  const list = document.querySelector<HTMLElement>('div.menu')
+  if (!list) throw new Error('there is no menu')
+  document.documentElement.scrollTop = 300
+  await user.click(within(list).getByRole('button', { name: title }))
+}
+
+test('the menu goes to the top of Settings and back, with focus on its icon', async () => {
+  render(<App />)
+  await screen.findByRole('form', { name: 'Add entry' })
+
+  await chooseInMenu('Settings')
+
+  await screen.findByRole('form', { name: 'Add label' })
+  expect(
+    screen.queryByRole('form', { name: 'Add entry' }),
+  ).not.toBeInTheDocument()
+  expect(
+    screen.getByRole('heading', { level: 2, name: 'Settings' }),
+  ).toBeInTheDocument()
+  expect(document.querySelector('div.settings-bar')).toContainElement(
+    menuIcon(),
+  )
+  expect(menuIcon()).toHaveFocus()
+  expect(menuIcon()).toHaveAttribute('aria-expanded', 'false')
+  expect(document.documentElement.scrollTop).toBe(0)
+
+  await chooseInMenu('Overview')
+
+  await screen.findByRole('form', { name: 'Add entry' })
+  expect(
+    screen.queryByRole('form', { name: 'Add label' }),
+  ).not.toBeInTheDocument()
+  expect(document.querySelector('div.period-bar')).toContainElement(menuIcon())
+  expect(menuIcon()).toHaveFocus()
+  expect(menuIcon()).toHaveAttribute('aria-expanded', 'false')
+  expect(document.documentElement.scrollTop).toBe(0)
+})
+
+test('the menu marks the screen shown', async () => {
+  const user = userEvent.setup()
+  render(<App />)
+  const marked = () =>
+    [...document.querySelectorAll('.menu [aria-current="page"]')].map(
+      (button) => button.textContent,
+    )
+  await user.click(menuIcon())
+  expect(marked()).toEqual(['Overview'])
+  await user.click(menuIcon())
+
+  await openSettings()
+
+  expect(marked()).toEqual(['Settings'])
+})
+
+test('choosing the current screen in the menu only closes it', async () => {
+  const user = userEvent.setup()
+  render(<App />)
+  const form = await screen.findByRole('form', { name: 'Add entry' })
+  await user.type(
+    within(form).getByRole('textbox', { name: 'Description' }),
+    'Not saved',
+  )
+
+  await chooseInMenu('Overview')
+
+  expect(menuIcon()).toHaveAttribute('aria-expanded', 'false')
+  expect(
+    within(screen.getByRole('form', { name: 'Add entry' })).getByRole(
+      'textbox',
+      { name: 'Description' },
+    ),
+  ).toHaveValue('Not saved')
+  expect(document.documentElement.scrollTop).toBe(300)
+})
+
+test('loading the app takes no focus', async () => {
+  render(<App />)
+  await screen.findByRole('form', { name: 'Add entry' })
+
+  expect(menuIcon()).not.toHaveFocus()
+  expect(document.body).toHaveFocus()
+})
+
+test('the tabs do not move focus to the menu icon, also after using the menu', async () => {
+  render(<App />)
+  await screen.findByRole('form', { name: 'Add entry' })
+
+  await openSettings()
+  await screen.findByRole('form', { name: 'Add label' })
+  expect(screen.getByRole('button', { name: 'Settings' })).toHaveFocus()
+  expect(menuIcon()).not.toHaveFocus()
+
+  await chooseInMenu('Overview')
+  await screen.findByRole('form', { name: 'Add entry' })
+  expect(menuIcon()).toHaveFocus()
+
+  await openSettings()
+  await screen.findByRole('form', { name: 'Add label' })
+  expect(screen.getByRole('button', { name: 'Settings' })).toHaveFocus()
+
+  await openOverview()
+  await screen.findByRole('form', { name: 'Add entry' })
+  expect(screen.getByRole('button', { name: 'Overview' })).toHaveFocus()
 })

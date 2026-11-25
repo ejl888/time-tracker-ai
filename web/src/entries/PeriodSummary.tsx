@@ -225,6 +225,8 @@ function ExpectedMetric({
     // Leaving the field saves it, so Enter only leaves it.
     if (event.key === 'Enter') event.currentTarget.blur()
     if (event.key === 'Escape') {
+      // Handled here, so an open menu does not take focus.
+      event.preventDefault()
       setText(textOf(stored))
       setError(undefined)
     }
