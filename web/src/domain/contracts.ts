@@ -44,6 +44,17 @@ export function periodOf(
   return { start, end: start.add({ days: 6 }), week: date.weekOfYear }
 }
 
+/** Whether the date is from the start up to and including the end. */
+export function isWithin(
+  date: Temporal.PlainDate,
+  { start, end }: Pick<Period, 'start' | 'end'>,
+): boolean {
+  return (
+    Temporal.PlainDate.compare(date, start) >= 0 &&
+    Temporal.PlainDate.compare(date, end) <= 0
+  )
+}
+
 /** The billable limit proposed for a billing cycle: 36:00 per week or 156:00 per month. */
 export function defaultLimit(cycle: BillingCycle): number {
   return cycle === 'month' ? 156 * 60 : 36 * 60
