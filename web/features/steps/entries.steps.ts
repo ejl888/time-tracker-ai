@@ -161,6 +161,32 @@ When(
   },
 )
 
+When(
+  'I delete the entry from {time} to {time}',
+  async function (
+    this: TimetrackerWorld,
+    start: Temporal.PlainTime,
+    end: Temporal.PlainTime,
+  ) {
+    const entries = (await this.entries.all()).filter(
+      (entry) =>
+        !entry.deleted &&
+        startTimeOf(entry).equals(start) &&
+        endTimeOf(entry).equals(end),
+    )
+    assert.equal(
+      entries.length,
+      1,
+      `entries from ${hhmm(start)} to ${hhmm(end)}: ${entries.length}`,
+    )
+    const result = await this.entryService.remove(entries[0].id)
+    assert.ok(
+      result.ok,
+      `could not delete the entry: ${JSON.stringify(result)}`,
+    )
+  },
+)
+
 When('I delete that entry', async function (this: TimetrackerWorld) {
   assert.ok(this.lastEntry, 'there is no entry yet')
   const result = await this.entryService.remove(this.lastEntry.id)
