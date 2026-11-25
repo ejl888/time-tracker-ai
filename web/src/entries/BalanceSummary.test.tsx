@@ -125,7 +125,7 @@ async function renderPage({
       timeZone={timeZone}
     />,
   )
-  await screen.findByRole('heading', { name: 'Entries' })
+  await screen.findByRole('heading', { level: 3 })
   return { user: userEvent.setup() }
 }
 
@@ -403,8 +403,8 @@ test('counts all days of the week as worked, also after the shown day, and no ot
   })
 
   await waitForValue('Worked', '7:15')
-  await goTo(user, 'Previous day', 'Tuesday 24 November 2026')
-  await goTo(user, 'Previous day', 'Monday 23 November 2026')
+  await goTo(user, 'Open Tuesday 24 November', 'Tuesday 24 November 2026')
+  await goTo(user, 'Open Monday 23 November', 'Monday 23 November 2026')
   await waitForValue('Worked', '7:15')
 
   await goTo(user, 'Previous day', 'Sunday 22 November 2026')
@@ -645,7 +645,7 @@ test('keeps the metrics shown when moving to another day in the same week', asyn
   await waitForValue('Worked', '1:00')
   const stopWatching = watchForGaps()
 
-  await goTo(user, 'Previous day', 'Tuesday 24 November 2026')
+  await goTo(user, 'Open Tuesday 24 November', 'Tuesday 24 November 2026')
 
   await waitForValue('Worked', '1:00')
   await waitForValue('Balance in', '+8:00')
@@ -811,7 +811,7 @@ test('shows Left for an earlier day of the current week', async () => {
   })
   await waitForMetric('Left', '8:00', 'Expected minus worked')
 
-  await goTo(user, 'Previous day', 'Tuesday 24 November 2026')
+  await goTo(user, 'Open Tuesday 24 November', 'Tuesday 24 November 2026')
 
   await waitForMetric('Left', '8:00', 'Expected minus worked')
 })

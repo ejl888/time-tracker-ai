@@ -88,7 +88,7 @@ async function renderPage({
       timeZone={timeZone}
     />,
   )
-  await screen.findByRole('heading', { name: 'Entries' })
+  await screen.findByRole('heading', { level: 3 })
   return { user: userEvent.setup(), contracts, contract: saved }
 }
 
@@ -339,7 +339,9 @@ test('keeps the Expected value when moving to another day in the same week', asy
   })
   observer.observe(region, { childList: true, subtree: true })
 
-  await user.click(screen.getByRole('button', { name: 'Previous day' }))
+  await user.click(
+    screen.getByRole('button', { name: 'Open Tuesday 24 November' }),
+  )
   await screen.findByRole('heading', { name: 'Tuesday 24 November 2026' })
 
   observer.disconnect()

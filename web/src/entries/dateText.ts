@@ -12,7 +12,12 @@ function formatDayMonth(date: Temporal.PlainDate, width: NameWidth): string {
 
 /** A date in English, e.g. "Wednesday 18 November 2026". */
 export function formatDateHeading(date: Temporal.PlainDate): string {
-  return `${formatDayMonth(date, 'long')} ${date.year}`
+  return `${formatLongDate(date)} ${date.year}`
+}
+
+/** A date in English without the year, e.g. "Wednesday 18 November". */
+export function formatLongDate(date: Temporal.PlainDate): string {
+  return formatDayMonth(date, 'long')
 }
 
 /** A date in short English without the year, e.g. "Wed 18 Nov". */

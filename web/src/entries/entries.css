@@ -1,4 +1,4 @@
-/* Entries screen, from the Log view and inline editor in docs/prototype/index.html. */
+/* Overview screen, from the overview and inline editor in docs/prototype/index.html. */
 .entries-page {
   display: flex;
   flex-direction: column;
@@ -37,6 +37,11 @@
   flex: 1;
 }
 
+.day-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
 .day {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -49,11 +54,38 @@
 .day.active {
   border-color: var(--accent);
 }
+.day.collapsed {
+  padding: 10px 16px;
+  gap: 6px;
+  cursor: pointer;
+}
+.day.collapsed:hover {
+  border-color: var(--muted);
+}
 .day-head {
   display: flex;
   align-items: baseline;
   gap: 10px;
   flex-wrap: wrap;
+}
+/* A button on a collapsed day, a heading on the open day. */
+.day-name {
+  font-size: inherit;
+  font-weight: 600;
+  background: none;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+}
+.today-pill {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: var(--accent);
+  color: var(--accent-ink);
+  padding: 1px 7px;
+  border-radius: 999px;
 }
 .day-total,
 .empty-day {

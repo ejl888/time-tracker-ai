@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import type { Temporal } from 'temporal-polyfill'
 import type { EntryService, Prefill, PrefillSource } from '../domain/entries.ts'
 import type { Label } from '../domain/records.ts'
@@ -19,12 +19,14 @@ interface AddEntryRowProps {
   prefill: Prefill | undefined
   /** Warns about the typed times, e.g. which entries they overlap. */
   warn: TimesWarning
-  /** Called after an entry was added; resolves to the prefill of the next entry. */
-  onAdded: () => Promise<Prefill | undefined>
+  /** Whether End, or Start without a prefill, gets focus when the prefill of an opened day or after an add is shown. */
+  focused: boolean
+  /** Called after an entry was added, to show the prefill of the next entry. */
+  onAdded: () => void
 }
 
-/** The texts typed in the add row; End is undefined while untouched, so it follows Start. */
-type TypedDraft = Omit<Draft, 'endText'> & { endText: string | undefined }
+/** The texts in the add row; End is undefined while untouched, so it follows Start. */
+type RowDraft = Omit<Draft, 'endText'> & { endText: string | undefined }
 
 /**
  * The end time a row is prefilled with. A prefilled end equals the start, so 00:00 can only mean a start of 00:00;
@@ -35,7 +37,7 @@ function prefilledEnd(end: Temporal.PlainTime): string {
 }
 
 /** The fields of a row nobody has typed in yet: the prefill, no label and no description. */
-function untouchedDraft(prefill: Prefill | undefined): TypedDraft {
+function untouchedDraft(prefill: Prefill | undefined): RowDraft {
   return {
     startText: prefill ? formatTime(prefill.start) : '',
     endText: undefined,
@@ -73,10 +75,17 @@ function followingEnd(prefill: Prefill | undefined, startText: string): string {
   return prefill && prefilledEnd(prefill.end) !== '' ? startText : ''
 }
 
+/** Whether focus is on something outside the row, e.g. another field; not when nothing has focus. */
+function focusIsOutside(row: HTMLElement | null): boolean {
+  const active = document.activeElement
+  return active !== document.body && !row?.contains(active)
+}
+
 /**
  * A form to add an entry to the shown date. Until you type in it, it shows the prefill, and End follows Start until
- * you change End. Add or Enter adds; after a successful add it shows the next prefill
- * with focus on End, or on Start when there is no prefill.
+ * you change End. Add or Enter adds; after a successful add it shows the next prefill.
+ * Once `focused`, it puts focus on End, or on Start when there is no prefill, unless you already typed in it or
+ * moved focus elsewhere.
  * Cancel or Esc resets it to the prefill.
  */
 export function AddEntryRow({
@@ -85,14 +94,16 @@ export function AddEntryRow({
   labels,
   timeZone,
   prefill,
+  focused,
   warn,
   onAdded,
 }: AddEntryRowProps) {
-  // Undefined while untouched, so a new prefill shows; set on the first change.
-  const [typed, setTyped] = useState<TypedDraft>()
+  // Only the fields you changed, so the others show the prefill, also when it loads later; undefined while untouched.
+  const [typed, setTyped] = useState<Partial<Draft>>()
+  const rowRef = useRef<HTMLDivElement>(null)
   const startRef = useRef<HTMLInputElement>(null)
   const endRef = useRef<HTMLInputElement>(null)
-  const current = typed ?? untouchedDraft(prefill)
+  const current: RowDraft = { ...untouchedDraft(prefill), ...typed }
   const draft: Draft = {
     ...current,
     endText: current.endText ?? followingEnd(prefill, current.startText),
@@ -102,21 +113,28 @@ export function AddEntryRow({
     ...choicesOf(labels),
   ]
 
-  async function added() {
+  const takeFocus = useEffectEvent(() => {
+    if (typed || focusIsOutside(rowRef.current)) return
+    ;(prefill ? endRef : startRef).current?.focus()
+  })
+  useEffect(() => {
+    if (focused) takeFocus()
+  }, [focused])
+
+  function added() {
     setTyped(undefined)
-    const next = await onAdded()
-    ;(next ? endRef : startRef).current?.focus()
+    onAdded()
   }
 
   return (
-    <div className="edit-row">
+    <div className="edit-row" ref={rowRef}>
       <EntryForm
         name="Add entry"
         submitText="Add"
         draft={draft}
         date={date}
         timeZone={timeZone}
-        onChange={(changes) => setTyped({ ...current, ...changes })}
+        onChange={(changes) => setTyped({ ...typed, ...changes })}
         labelChoices={labelChoices}
         endTouched={current.endText !== undefined}
         startHelp={startHelpOf(prefill, current.startText)}
@@ -124,7 +142,7 @@ export function AddEntryRow({
         save={(fields: DraftFields) =>
           entries.add({ ...fields, date, timeZone })
         }
-        onDone={() => void added()}
+        onDone={added}
         onCancel={() => setTyped(undefined)}
         startRef={startRef}
         endRef={endRef}
