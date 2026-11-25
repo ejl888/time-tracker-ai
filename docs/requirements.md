@@ -117,11 +117,15 @@ _Priority: **Must** (first version), **Should** (soon after), **Could** (later).
 - An entry cannot run past midnight; split it into two entries. Ending at exactly midnight is allowed (shown as `24:00`).
 - The app warns when entries on the same day overlap. Gaps between entries are allowed.
 - Hours left to work = billed hours − worked hours in the current period. The balance is shown separately.
+- In the current period the summary shows the hours left: "–" until expected billable hours are entered, and never below
+  0:00; when more is worked, it shows by how much. A past period shows the balance after it instead.
 - Billed hours are not shown separately; when the expected billable hours exceed the limit, a note says they are capped.
 - Expected billable hours are entered once the period has started; future periods cannot be opened.
 - When no expected billable hours are entered for a period, billed hours are 0.
 - The period that holds the contract start is the first period, with the full limit; earlier periods have no expected
   billable hours.
+- Entries before the contract start do not count in the worked hours or balance of a period, even in the first period;
+  the total of a day does include them.
 - Expected billable hours, the billable limit and the starting balance are entered as whole hours or `H:MM` (e.g. `36`
   or `7:30`), without decimals. The starting balance may have a sign; both `-` and `−` work. Unlike in the prototype,
   these fields use the normal keyboard, as the decimal keypad of phones has no `:` or `-`.
