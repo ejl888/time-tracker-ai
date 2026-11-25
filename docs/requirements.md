@@ -161,9 +161,12 @@ _Priority: **Must** (first version), **Should** (soon after), **Could** (later).
 #### Overview layout
 
 - The newest day is on top; within a day, entries are in time order with the empty row at the bottom.
-- Days after today are not shown.
-- One day is active (today by default; in another period the most recent workday). Other days show one line: date,
-  worked hours, number of entries, overlap warning, and a small timeline.
+- Days after today are not shown. Every day of the period up to today is shown, also empty weekend days.
+- Periods go back to the contract start or the earliest entry, whichever is first. Without a contract the overview shows
+  weeks.
+- One day is active (today by default; in another period the most recent workday, Monday to Friday, even when it is
+  empty). Other days show one line: date, worked hours, number of entries, overlap warning, and a small timeline.
+- The timeline follows the clock times; durations stay the real ones on days the clock changes.
 - Phone: the header is a menu icon (Overview, Settings), the period with ‹ › arrows and a today button, and one row of
   totals: balance in, expected, worked, left. Swiping left/right changes the period.
 - Laptop: the app title and tabs are shown, and the totals include a short explanation each.
