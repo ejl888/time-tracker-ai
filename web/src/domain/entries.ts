@@ -5,7 +5,7 @@ import type { Entry } from './records.ts'
 import type { Repository } from './repository.ts'
 import type { Result } from './result.ts'
 import { newRecordFields, toInstant, touch } from './recordFields.ts'
-import { MIDNIGHT } from './timeText.ts'
+import { endMinutesOf, MIDNIGHT, minutesOf } from './timeText.ts'
 
 export type EntryError =
   'end-not-after-start' | 'no-label' | 'after-today' | 'not-found'
@@ -27,16 +27,6 @@ export type EntryChanges = Partial<
 
 /** The date, wall-clock times and time zone of an entry. */
 export type TimeRange = Pick<NewEntry, 'date' | 'start' | 'end' | 'timeZone'>
-
-/** Minutes since the start of the day of a wall-clock time. */
-function minutesOf(time: Temporal.PlainTime): number {
-  return time.hour * 60 + time.minute
-}
-
-/** Minutes since the start of the day of a wall-clock end time; an end of 00:00 is 24:00. */
-function endMinutesOf(end: Temporal.PlainTime): number {
-  return end.equals(MIDNIGHT) ? 24 * 60 : minutesOf(end)
-}
 
 /**
  * Whether an end time is after a start time on the clock of one day; an end of 00:00 is 24:00.

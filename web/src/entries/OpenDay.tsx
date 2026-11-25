@@ -10,6 +10,7 @@ import type { DayEntriesProps } from './DayEntries.tsx'
 import { DayEntries } from './DayEntries.tsx'
 import { DayHead } from './DayHead.tsx'
 import { overlapWarning } from './overlapWarning.ts'
+import { Timeline } from './Timeline.tsx'
 
 interface OpenDayProps extends DayEntriesProps {
   isToday: boolean
@@ -43,6 +44,7 @@ export function OpenDay({
         isToday={isToday}
         total={workedText(day)}
       />
+      <Timeline day={day} scale />
       <DayEntries {...dayEntries} />
       {editing === undefined && (
         <AddEntryRow
