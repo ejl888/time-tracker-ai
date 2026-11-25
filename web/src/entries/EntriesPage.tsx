@@ -56,7 +56,6 @@ export function EntriesPage({
 
   return (
     <section className="entries-page">
-      <h2 className="page-title">Entries</h2>
       {period && (
         <PeriodBar
           period={period}

@@ -5,17 +5,6 @@
   gap: 12px;
 }
 
-/* Not in the prototype: keeps the "Entries" heading visible as a caption. */
-.page-title {
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted);
-  margin: 0;
-}
-
 .period-bar {
   display: flex;
   align-items: center;
