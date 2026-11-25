@@ -5,7 +5,8 @@ Feature: Billed hours and balance
   next period.
 
   Background:
-    Given a contract starting on 2026-10-05 with a weekly billing cycle
+    Given today is 2026-11-30
+    And a contract starting on 2026-10-05 with a weekly billing cycle
     And a billable limit of 36:00 per period
     And a starting balance of 0:00
 
@@ -55,6 +56,21 @@ Feature: Billed hours and balance
         | week of    | expected | worked |
         | 2026-10-05 | 36:00    | 30:00  |
       Then the balance after the week of 2026-10-05 is -1:00
+
+    Scenario: A week without expected billable hours carries over everything worked
+      Given I expect to bill 36:00 in the week of 2026-10-05
+      And I worked 36:00 in the week of 2026-10-05
+      And I worked 8:00 in the week of 2026-10-12
+      Then the balance after the week of 2026-10-12 is +8:00
+      And the balance carried into the week of 2026-10-19 is +8:00
+
+    Scenario: Entries before the contract start do not count, even in the first week
+      Given a billable label Project
+      And a contract starting on 2026-10-07 with a weekly billing cycle
+      And I expect to bill 4:00 in the week of 2026-10-05
+      And an entry on 2026-10-06 from 09:00 to 17:00 labelled Project
+      And an entry on 2026-10-07 from 09:00 to 17:00 labelled Project
+      Then the balance after the week of 2026-10-05 is +4:00
 
   Rule: Hours left to work = billed hours - worked hours in the period
 

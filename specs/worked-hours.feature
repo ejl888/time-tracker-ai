@@ -3,7 +3,8 @@ Feature: Worked hours
   Worked hours are the total duration of all entries with a billable label.
 
   Background:
-    Given these labels:
+    Given today is 2026-11-30
+    And these labels:
       | label   | billable |
       | Project | yes      |
       | Meeting | yes      |
