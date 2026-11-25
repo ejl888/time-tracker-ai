@@ -1,10 +1,10 @@
 /* Settings screen, from the Settings view in docs/prototype/index.html. */
-/* Phones only: the menu and the title. */
-.settings-bar {
+/* Phones only: the menu and the title. Both classes, to win from the display of .sticky-top. */
+.sticky-top.settings-bar {
   display: none;
 }
 @media (max-width: 560px), (max-height: 480px) {
-  .settings-bar {
+  .sticky-top.settings-bar {
     display: flex;
     flex-direction: row;
     align-items: center;

@@ -1,0 +1,166 @@
+/*
+ * The bar that stays at the top while scrolling, from docs/prototype/index.html: the period and its
+ * totals in a compact size, and on phones the menu and title of Settings.
+ */
+
+/*
+ * Room for the bar, so the browser never scrolls a focused field behind it: per layout the greatest
+ * measured height (laptop 178px, phone 109px, or 127px with a note), and 6px for the focus outline.
+ * Not while focus is in the bar itself: the browser would scroll that field away from under the bar.
+ */
+html:has(.period-bar):not(:has(.sticky-top :focus)) {
+  scroll-padding-top: calc(env(safe-area-inset-top, 0px) + 184px);
+}
+@media (max-width: 560px), (max-height: 480px) {
+  html:has(.period-bar):not(:has(.sticky-top :focus)) {
+    scroll-padding-top: calc(env(safe-area-inset-top, 0px) + 115px);
+  }
+  html:has(.metric .keep, .metric .err):not(:has(.sticky-top :focus)) {
+    scroll-padding-top: calc(env(safe-area-inset-top, 0px) + 133px);
+  }
+  /* Settings: 47px. */
+  html:has(.settings-bar):not(:has(.sticky-top :focus)) {
+    scroll-padding-top: calc(env(safe-area-inset-top, 0px) + 53px);
+  }
+}
+
+/* Covers what scrolls behind the notch, above the bar. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0 0 auto;
+  height: env(safe-area-inset-top, 0px);
+  z-index: 10;
+  background: var(--bg);
+}
+.sticky-top {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 10;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-block: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.sticky-top .period-title {
+  font-size: 18px;
+}
+.sticky-top .summary {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.sticky-top .metric {
+  padding: 8px 12px;
+}
+.sticky-top .metric .k {
+  font-size: 11px;
+}
+.sticky-top .metric .v {
+  font-size: 19px;
+}
+.sticky-top .exp-input {
+  font-size: 17px;
+  max-width: 96px;
+  padding: 0 6px;
+}
+.period-sub.short {
+  display: none;
+}
+
+@media (max-width: 560px), (max-height: 480px) {
+  .sticky-top {
+    gap: 6px;
+    padding-block: 8px;
+  }
+  .sticky-top .period-title {
+    font-size: 16px;
+  }
+  .sticky-top .icon-btn {
+    width: 30px;
+    height: 30px;
+    flex: none;
+  }
+
+  /* One row: the arrows stay in view, the dates give way. */
+  .sticky-top .period-bar {
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+  .sticky-top .spacer {
+    display: none;
+  }
+  .ptitle {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    flex: 1;
+    justify-content: safe center;
+    white-space: nowrap;
+    /* The prototype hides the overflow; this leaves room for the focus outline of the title. */
+    overflow: clip;
+    overflow-clip-margin: 4px;
+  }
+  .sticky-top .ptitle .period-title {
+    flex: none;
+    font-size: 15px;
+  }
+  .ptitle .period-sub.full {
+    display: none;
+  }
+  .ptitle .period-sub.short {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sticky-top .summary {
+    background: none;
+    border: 0;
+    border-radius: 0;
+    /* Not clipped, for the focus outline of Expected. */
+    overflow: visible;
+  }
+  .sticky-top .summary > .hint {
+    padding: 0 4px;
+  }
+  /* Differs from the prototype: names, values and a kept note are rows of the summary, so the note can span it. */
+  .sticky-top .metric {
+    display: contents;
+  }
+  .sticky-top .metric .k,
+  .sticky-top .metric .v,
+  .sticky-top .metric .n {
+    margin-inline: 4px;
+    min-width: 0;
+  }
+  .sticky-top .metric .k {
+    grid-row: 1;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+  }
+  .sticky-top .metric .v {
+    grid-row: 2;
+    font-size: 16px;
+  }
+  .sticky-top .metric .n {
+    display: none;
+  }
+  .sticky-top .metric .n.err,
+  .sticky-top .metric .n.keep {
+    display: block;
+    grid-row: 3;
+    grid-column: 1 / -1;
+  }
+  .sticky-top .exp-input {
+    grid-row: 2;
+    justify-self: start;
+    width: calc(100% - 8px);
+    margin-inline: 4px;
+    padding: 0 2px;
+    /* From 16px, iOS does not zoom in on the field. */
+    font-size: 16px;
+    background: var(--surface);
+  }
+}

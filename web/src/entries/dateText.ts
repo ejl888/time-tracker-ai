@@ -35,9 +35,17 @@ export function formatDateRange(
   start: Temporal.PlainDate,
   end: Temporal.PlainDate,
 ): string {
+  return `${formatShortDateRange(start, end)} ${end.year}`
+}
+
+/** The days of a period without the year, e.g. "23–29 Nov", or "28 Dec – 3 Jan" across two months. */
+export function formatShortDateRange(
+  start: Temporal.PlainDate,
+  end: Temporal.PlainDate,
+): string {
   const month = (date: Temporal.PlainDate) =>
     date.toLocaleString('en-GB', { month: 'short' })
-  const last = `${end.day} ${month(end)} ${end.year}`
+  const last = `${end.day} ${month(end)}`
   if (start.month === end.month && start.year === end.year) {
     return `${start.day}–${last}`
   }
