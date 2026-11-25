@@ -36,3 +36,26 @@ defineParameterType({
   regexp: /\d+:\d{2}/,
   transformer: (text: string) => text,
 })
+
+/** The first day of a calendar month such as 2026-10. */
+export function parseMonth(text: string): Temporal.PlainDate {
+  return Temporal.PlainYearMonth.from(text).toPlainDate({ day: 1 })
+}
+
+// A calendar month such as 2026-10, parsed with parseMonth.
+defineParameterType({
+  name: 'month',
+  regexp: /\d{4}-\d{2}/,
+  transformer: parseMonth,
+  // Otherwise the start of every date could become {month} in a snippet.
+  useForSnippets: false,
+})
+
+// A duration with an optional sign such as +8:00, -1:00 or 0:00, kept as text like {duration}.
+defineParameterType({
+  name: 'signed',
+  regexp: /[+-]?\d+:\d{2}/,
+  transformer: (text: string) => text,
+  // Otherwise every duration is ambiguous in a snippet.
+  useForSnippets: false,
+})
