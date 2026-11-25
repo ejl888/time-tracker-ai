@@ -151,6 +151,10 @@ header.app {
   opacity: 0.4;
   cursor: default;
 }
+.icon-btn svg {
+  width: 16px;
+  height: 16px;
+}
 
 /* Form fields: a label above the control and a help line below. */
 .field {

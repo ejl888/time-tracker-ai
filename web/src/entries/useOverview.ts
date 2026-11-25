@@ -24,6 +24,29 @@ export function useContract(
   return contract
 }
 
+/**
+ * The earliest date with entries: undefined while loading, null without entries. A raised revision
+ * loads it again, keeping the known one until then.
+ */
+export function useFirstDate(
+  entries: EntryService,
+  revision: number,
+): Temporal.PlainDate | null | undefined {
+  const [firstDate, setFirstDate] = useState<Temporal.PlainDate | null>()
+
+  useEffect(() => {
+    let current = true
+    void entries.firstDate().then((found) => {
+      if (current) setFirstDate(found ?? null)
+    })
+    return () => {
+      current = false
+    }
+  }, [revision, entries])
+
+  return firstDate
+}
+
 /** The entries of a period, with the labels to show them. */
 export interface PeriodEntries {
   entries: Entry[]

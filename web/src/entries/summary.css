@@ -1,7 +1,7 @@
 /*
  * Period summary, from the summary strip of the Log view in docs/prototype/index.html.
- * The columns are fixed instead of auto-fit: the full-width title row keeps auto-fit from
- * collapsing empty columns, so a wide screen would get 6 columns for the 4 metrics.
+ * The columns are fixed instead of auto-fit: in between, auto-fit would put 3 metrics on the
+ * first row and 1 on the second.
  */
 .summary {
   display: grid;
@@ -17,28 +17,6 @@
 }
 .summary > .hint {
   padding: 14px 16px;
-}
-
-/* The prototype shows the period title in the period bar; here it heads the summary as a full-width row. */
-.summary .ptitle {
-  grid-column: 1 / -1;
-  min-width: 0;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--line);
-  display: flex;
-  flex-direction: column;
-}
-/* The prototype's .period-title, at its compact header size. */
-.period-name {
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 18px;
-  text-wrap: balance;
-  margin: 0;
-}
-.period-sub {
-  color: var(--muted);
-  font-size: 13px;
 }
 
 /* One metric per cell; each draws its right and bottom border, the outer ones are clipped by the summary. */
@@ -101,18 +79,9 @@
   }
 }
 
-/* Phones: smaller values, and the period name and its dates on one line. */
+/* Phones: smaller values. */
 @media (max-width: 560px) {
-  .summary .ptitle {
-    flex-direction: row;
-    align-items: baseline;
-    flex-wrap: wrap;
-    column-gap: 6px;
-  }
   .metric .v {
     font-size: 20px;
-  }
-  .period-name {
-    font-size: 15px;
   }
 }

@@ -44,6 +44,8 @@ interface Setup {
   contract?: ContractFields
   /** Expected minutes to store first, by period start. */
   expected?: Record<string, number>
+  /** The dates to store an entry on first. */
+  entryDates?: string[]
 }
 
 /** Renders the Entries page on in-memory services, today at noon in Amsterdam. */
@@ -51,6 +53,7 @@ async function renderPage({
   today = '2026-11-25',
   contract,
   expected = {},
+  entryDates = [],
 }: Setup = {}) {
   const clock = fixedClock(
     Temporal.PlainDate.from(today)
@@ -69,6 +72,19 @@ async function renderPage({
     new InMemoryRepository<ExpectedHours>(),
     clock,
   )
+  for (const date of entryDates) {
+    const label = await labels.create('Client', { billable: true })
+    if (!label.ok) throw new Error(`could not seed label: ${label.error}`)
+    const added = await entries.add({
+      date: Temporal.PlainDate.from(date),
+      start: Temporal.PlainTime.from('09:00'),
+      end: Temporal.PlainTime.from('10:00'),
+      labelId: label.value.id,
+      description: '',
+      timeZone,
+    })
+    if (!added.ok) throw new Error(`could not seed entry: ${added.error}`)
+  }
   let saved: Contract | undefined
   if (contract) {
     const result = await contracts.save(contract)
@@ -97,6 +113,25 @@ async function findSummary() {
   return within(await screen.findByRole('region', { name: 'Period summary' }))
 }
 
+/** Queries inside the period bar, once it is shown. */
+async function findBar() {
+  return waitFor(() => {
+    const bar = document.querySelector<HTMLElement>('.period-bar')
+    expect(bar).toBeInTheDocument()
+    return within(bar!)
+  })
+}
+
+/** Clicks an arrow button of the period bar once it is enabled. */
+async function clickArrow(
+  user: ReturnType<typeof userEvent.setup>,
+  name: string,
+) {
+  const button = await screen.findByRole('button', { name })
+  await waitFor(() => expect(button).toBeEnabled())
+  await user.click(button)
+}
+
 /** The Expected field, once it is shown. */
 async function findExpected() {
   const summary = await findSummary()
@@ -120,9 +155,10 @@ test('asks to set up the contract when there is none, without an Expected field'
 test('shows the week of the day with its dates and an Expected field', async () => {
   await renderPage({ contract: weekly })
 
+  const bar = await findBar()
   const summary = await findSummary()
-  expect(await summary.findByText('Week 48')).toBeInTheDocument()
-  expect(summary.getByText('23–29 Nov 2026')).toBeInTheDocument()
+  expect(await bar.findByText('Week 48')).toBeInTheDocument()
+  expect(bar.getByText('23–29 Nov 2026')).toBeInTheDocument()
   expect(await findExpected()).toHaveValue('')
   expect(
     summary.getByText('Enter at the start of the week'),
@@ -132,17 +168,18 @@ test('shows the week of the day with its dates and an Expected field', async () 
 test('shows both months for a week across two months', async () => {
   await renderPage({ today: '2027-01-01', contract: weekly })
 
-  const summary = await findSummary()
-  expect(await summary.findByText('Week 53')).toBeInTheDocument()
-  expect(summary.getByText('28 Dec – 3 Jan 2027')).toBeInTheDocument()
+  const bar = await findBar()
+  expect(await bar.findByText('Week 53')).toBeInTheDocument()
+  expect(bar.getByText('28 Dec – 3 Jan 2027')).toBeInTheDocument()
 })
 
 test('shows the month of the day for a monthly contract', async () => {
   await renderPage({ contract: monthly })
 
+  const bar = await findBar()
   const summary = await findSummary()
-  expect(await summary.findByText('November 2026')).toBeInTheDocument()
-  expect(summary.getByText('Monthly billing period')).toBeInTheDocument()
+  expect(await bar.findByText('November 2026')).toBeInTheDocument()
+  expect(bar.getByText('Monthly billing period')).toBeInTheDocument()
   expect(await findExpected()).toHaveValue('')
   expect(
     summary.getByText('Enter at the start of the month'),
@@ -265,7 +302,7 @@ test.each(['36.5', '-4', 'abc'])(
   },
 )
 
-test('shows the other week and its expected hours after going to the previous day', async () => {
+test('shows the other week and its expected hours after going to the previous week', async () => {
   const { user } = await renderPage({
     today: '2026-11-23',
     contract: weekly,
@@ -274,11 +311,11 @@ test('shows the other week and its expected hours after going to the previous da
 
   expect(await findExpected()).toHaveValue('32:00')
 
-  await user.click(screen.getByRole('button', { name: 'Previous day' }))
+  await clickArrow(user, 'Previous week')
 
-  const summary = await findSummary()
-  expect(await summary.findByText('Week 47')).toBeInTheDocument()
-  expect(summary.getByText('16–22 Nov 2026')).toBeInTheDocument()
+  const bar = await findBar()
+  expect(await bar.findByText('Week 47')).toBeInTheDocument()
+  expect(bar.getByText('16–22 Nov 2026')).toBeInTheDocument()
   await waitFor(async () => expect(await findExpected()).toHaveValue('30:00'))
 })
 
@@ -286,10 +323,11 @@ test('says the day is before the contract start instead of showing the Expected 
   const { user } = await renderPage({
     today: '2026-11-23',
     contract: { ...weekly, startDate: '2026-11-23' },
+    entryDates: ['2026-11-18'],
   })
 
   await findExpected()
-  await user.click(screen.getByRole('button', { name: 'Previous day' }))
+  await clickArrow(user, 'Previous week')
 
   const summary = await findSummary()
   expect(
@@ -306,8 +344,9 @@ test('shows the week that holds a midweek contract start, with its Expected fiel
     contract: { ...weekly, startDate: '2026-11-25' },
   })
 
+  const bar = await findBar()
   const summary = await findSummary()
-  expect(await summary.findByText('Week 48')).toBeInTheDocument()
+  expect(await bar.findByText('Week 48')).toBeInTheDocument()
   expect(
     summary.queryByText('Before your contract starts'),
   ).not.toBeInTheDocument()
@@ -346,7 +385,7 @@ test('keeps the Expected value when moving to another day in the same week', asy
 
   observer.disconnect()
   expect(region).toBeInTheDocument()
-  expect(within(region).getByText('Week 48')).toBeInTheDocument()
+  expect((await findBar()).getByText('Week 48')).toBeInTheDocument()
   expect(within(region).getByRole('textbox', { name: 'Expected' })).toHaveValue(
     '40:00',
   )
@@ -380,9 +419,9 @@ test('marks the Expected field invalid and links it to the message', async () =>
 test('shows the period title as a level 2 heading', async () => {
   await renderPage({ contract: weekly })
 
-  const summary = await findSummary()
+  const bar = await findBar()
   expect(
-    await summary.findByRole('heading', { level: 2, name: 'Week 48' }),
+    await bar.findByRole('heading', { level: 2, name: 'Week 48' }),
   ).toBeInTheDocument()
 })
 
@@ -518,9 +557,9 @@ test('keeps the saved Expected value when returning before the other week has lo
   )
 
   try {
-    await user.click(screen.getByRole('button', { name: 'Previous day' }))
-    await screen.findByRole('heading', { name: 'Sunday 22 November 2026' })
-    await user.click(screen.getByRole('button', { name: 'Next day' }))
+    await clickArrow(user, 'Previous week')
+    await screen.findByRole('heading', { name: 'Friday 20 November 2026' })
+    await clickArrow(user, 'Next week')
     await screen.findByRole('heading', { name: 'Monday 23 November 2026' })
 
     await waitFor(async () => expect(await findExpected()).toHaveValue('40:00'))

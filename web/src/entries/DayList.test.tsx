@@ -179,6 +179,13 @@ async function open(user: User, name: string) {
   await waitForOpen(name)
 }
 
+/** Clicks an arrow button of the period bar once it is enabled. */
+async function clickArrow(user: User, name: string) {
+  const button = await screen.findByRole('button', { name })
+  await waitFor(() => expect(button).toBeEnabled())
+  await user.click(button)
+}
+
 /** The add row of an open day, once it is shown. */
 async function findAddRow(name: string) {
   const form = await within(await findDay(name)).findByRole('form', {
@@ -808,16 +815,17 @@ test('opening a day keeps the Expected field and its text', async () => {
   expect(field).toHaveValue('abc')
 })
 
-test('the arrow buttons open the neighbouring day', async () => {
-  const { user } = await renderPage()
+test('the arrow buttons go to the neighbouring month', async () => {
+  const { user } = await renderPage({ contract: monthly })
   await waitForOpen(WED)
 
-  await user.click(screen.getByRole('button', { name: 'Previous day' }))
-  await waitForOpen(TUE)
+  await clickArrow(user, 'Previous month')
+  await waitFor(() => expect(allDays()).toHaveLength(31))
+  await waitForOpen('Friday 30 October')
 
-  await user.click(screen.getByRole('button', { name: 'Next day' }))
+  await clickArrow(user, 'Next month')
+  await waitFor(() => expect(allDays()).toHaveLength(18))
   await waitForOpen(WED)
-  await waitForDays([WED, TUE, MON])
 })
 
 test('the list follows the arrow buttons to another week', async () => {
@@ -827,7 +835,7 @@ test('the list follows the arrow buttons to another week', async () => {
   })
   await waitForDays(['Monday 23 November'])
 
-  await user.click(screen.getByRole('button', { name: 'Previous day' }))
+  await clickArrow(user, 'Previous week')
 
   await waitForDays(
     november(
@@ -840,10 +848,10 @@ test('the list follows the arrow buttons to another week', async () => {
       ['Monday', 16],
     ),
   )
-  await waitForOpen('Sunday 22 November')
+  await waitForOpen('Friday 20 November')
   await waitForLine(WED, '1:00 worked · 1 entry')
 
-  await user.click(screen.getByRole('button', { name: 'Next day' }))
+  await clickArrow(user, 'Next week')
 
   await waitForDays(['Monday 23 November'])
   await waitForOpen('Monday 23 November')
@@ -911,8 +919,10 @@ test('a slow load of another week does not show in the week gone back to', async
     await within(day(monday)).findByText('1:00 worked'),
   ).toBeInTheDocument()
 
+  const previous = await screen.findByRole('button', { name: 'Previous week' })
+  await waitFor(() => expect(previous).toBeEnabled())
   loads.holding = true
-  await user.click(screen.getByRole('button', { name: 'Previous day' }))
+  await user.click(previous)
   await waitFor(() => expect(loads.held).toBeGreaterThan(0))
   // Nothing is known of the other week yet, and this week is no longer shown.
   expect(screen.queryByRole('region', { name: monday })).not.toBeInTheDocument()
@@ -920,7 +930,7 @@ test('a slow load of another week does not show in the week gone back to', async
   expect(screen.queryByText('No entries')).not.toBeInTheDocument()
 
   loads.holding = false
-  await user.click(screen.getByRole('button', { name: 'Next day' }))
+  await clickArrow(user, 'Next week')
   await waitForDays([monday])
   await loads.release()
 
@@ -955,18 +965,18 @@ test('a slow reload after a change does not show in another week opened since', 
     prepare: loads.prepare,
   })
   const monday = 'Monday 23 November'
-  const sunday = 'Sunday 22 November'
+  const friday = 'Friday 20 November'
   await waitForOpen(monday)
 
   loads.holding = true
   await addEntry(user, monday, '09:00', '10:00')
   await waitFor(() => expect(loads.held).toBeGreaterThan(0))
   loads.holding = false
-  await user.click(screen.getByRole('button', { name: 'Previous day' }))
-  await waitForOpen(sunday)
+  await clickArrow(user, 'Previous week')
+  await waitForOpen(friday)
   await loads.release()
 
-  await waitForOpen(sunday)
+  await waitForOpen(friday)
   expect(allDays()).toHaveLength(7)
   await waitForLine(WED, '8:00 worked · 1 entry')
 })
