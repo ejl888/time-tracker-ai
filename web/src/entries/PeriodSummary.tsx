@@ -1,6 +1,7 @@
 import { useId, useState } from 'react'
 import type { KeyboardEvent } from 'react'
-import type { Temporal } from 'temporal-polyfill'
+import { Temporal } from 'temporal-polyfill'
+import { periodResult } from '../domain/balance.ts'
 import type { ContractService, Period } from '../domain/contracts.ts'
 import { coversPeriod } from '../domain/contracts.ts'
 import type { Contract } from '../domain/records.ts'
@@ -17,9 +18,12 @@ import { Metric } from './Metric.tsx'
 import {
   BEFORE_CONTRACT_MESSAGE,
   NO_CONTRACT_MESSAGE,
+  balanceAfterNote,
+  balanceAfterTitle,
   balanceInNote,
   balanceInTitle,
   expectedNote,
+  leftNote,
   periodTitle,
   workedNote,
 } from './summaryMessages.ts'
@@ -29,19 +33,24 @@ import './summary.css'
 
 interface PeriodSummaryProps extends SummaryServices {
   date: Temporal.PlainDate
+  today: Temporal.PlainDate
   /** Raised when entries changed, to load the totals again. */
   revision: number
 }
 
-/** The summary bar above the day: the period of the day with its balance, expected and worked hours. */
+/**
+ * The summary bar above the day: the period of the day with its balance, expected and worked hours,
+ * and the hours left or the balance after it.
+ */
 export function PeriodSummary({
   contracts,
   entries,
   labels,
   date,
+  today,
   revision,
 }: PeriodSummaryProps) {
-  const { contract, period, loaded } = useSummary(
+  const { contract, period, loaded, showExpected } = useSummary(
     { contracts, entries, labels },
     date,
     revision,
@@ -55,7 +64,11 @@ export function PeriodSummary({
           contracts={contracts}
           contract={contract}
           period={period}
+          today={today}
           loaded={loaded}
+          onExpectedSaved={(expected) =>
+            showExpected(period.start.toString(), expected)
+          }
         />
       )}
     </section>
@@ -73,18 +86,29 @@ function SummaryContent({
   contracts,
   contract,
   period,
+  today,
   loaded,
+  onExpectedSaved,
 }: {
   contracts: ContractService
   contract: Contract
   period: Period
+  today: Temporal.PlainDate
   loaded: LoadedSummary
+  onExpectedSaved: (expected: number | undefined) => void
 }) {
   if (!coversPeriod(contract, period)) {
     return <p className="hint">{BEFORE_CONTRACT_MESSAGE}</p>
   }
   const { expected, totals } = loaded
   const { balanceIn, worked } = totals
+  const result = periodResult(
+    contract.billableLimit,
+    expected,
+    balanceIn,
+    worked.billable,
+  )
+  const isPast = Temporal.PlainDate.compare(period.end, today) < 0
   const { title, sub } = periodTitle(period, contract.billingCycle)
   return (
     <>
@@ -105,13 +129,49 @@ function SummaryContent({
         contract={contract}
         period={period}
         stored={expected}
+        onSaved={onExpectedSaved}
       />
       <Metric
         name="Worked"
         value={formatMinutes(worked.billable)}
         note={workedNote(worked.nonBillable)}
       />
+      {isPast ? (
+        <Metric
+          name="Balance after"
+          title={balanceAfterTitle(contract.billingCycle)}
+          value={formatSignedMinutes(result.balanceAfter)}
+          tone={toneOf(result.balanceAfter)}
+          note={balanceAfterNote(result.balanceAfter)}
+        />
+      ) : (
+        <LeftMetric
+          limit={contract.billableLimit}
+          expected={expected}
+          left={result.left}
+        />
+      )}
     </>
+  )
+}
+
+/** The hours left in the current period; "–" until expected hours are entered. */
+function LeftMetric({
+  limit,
+  expected,
+  left,
+}: {
+  limit: number
+  expected: number | undefined
+  /** Negative when more is worked than billed. */
+  left: number
+}) {
+  return (
+    <Metric
+      name="Left"
+      value={expected === undefined ? '–' : formatMinutes(Math.max(0, left))}
+      note={leftNote(limit, expected, left)}
+    />
   )
 }
 
@@ -126,21 +186,23 @@ function ExpectedMetric({
   contract,
   period,
   stored,
+  onSaved,
 }: {
   contracts: ContractService
   contract: Contract
   period: Period
-  /** The expected minutes stored when the period was loaded. */
+  /** The expected minutes stored for the period. */
   stored: number | undefined
+  /** Called with the new expected minutes after they were saved. */
+  onSaved: (expected: number | undefined) => void
 }) {
   const id = useId()
-  const [saved, setSaved] = useState(stored)
   const [text, setText] = useState(() => textOf(stored))
   const [error, setError] = useState<string>()
 
   const typed = text.trim() === '' ? undefined : parseHours(text)
-  // The note follows what is typed; while that is not valid, it follows the saved value.
-  const shownValue = text.trim() === '' || typed !== undefined ? typed : saved
+  // The note follows what is typed; while that is not valid, it follows the stored value.
+  const shownValue = text.trim() === '' || typed !== undefined ? typed : stored
 
   async function save() {
     if (text.trim() !== '' && typed === undefined) {
@@ -156,7 +218,7 @@ function ExpectedMetric({
       setError(contractErrorMessage(result.error))
       return
     }
-    setSaved(typed)
+    onSaved(typed)
     setText(textOf(typed))
   }
 
@@ -164,7 +226,7 @@ function ExpectedMetric({
     // Leaving the field saves it, so Enter only leaves it.
     if (event.key === 'Enter') event.currentTarget.blur()
     if (event.key === 'Escape') {
-      setText(textOf(saved))
+      setText(textOf(stored))
       setError(undefined)
     }
   }

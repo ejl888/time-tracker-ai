@@ -170,6 +170,7 @@ export function EntriesPage({
         entries={entries}
         labels={labels}
         date={date}
+        today={today}
         revision={revision}
       />
       {shown && (

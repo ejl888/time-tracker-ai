@@ -70,6 +70,8 @@ export function useSummary(
   period: Period | undefined
   /** The values of the period, or undefined until all of them are loaded. */
   loaded: LoadedSummary | undefined
+  /** Shows the saved expected minutes of a period; ignored when that period is no longer shown. */
+  showExpected: (periodStart: string, expected: number | undefined) => void
 } {
   const [contract, setContract] = useState<Contract | null>()
   const [loadedExpected, setLoadedExpected] = useState<LoadedExpected>()
@@ -127,5 +129,13 @@ export function useSummary(
       ? { expected: loadedExpected.expected, totals: loadedTotals.totals }
       : undefined
 
-  return { contract, period, loaded }
+  function showExpected(savedStart: string, expected: number | undefined) {
+    setLoadedExpected((previous) =>
+      previous?.periodStart === savedStart
+        ? { periodStart: savedStart, expected }
+        : previous,
+    )
+  }
+
+  return { contract, period, loaded, showExpected }
 }
