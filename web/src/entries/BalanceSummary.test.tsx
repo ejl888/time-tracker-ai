@@ -162,9 +162,14 @@ async function findExpected() {
   })
 }
 
-/** Waits until the summary shows the period with this title, e.g. "Week 48". */
+/** Waits until the period bar shows the period with this title, e.g. "Week 48". */
 async function findPeriod(title: string) {
-  await within(summaryRegion()).findByRole('heading', { name: title })
+  await waitFor(() => {
+    const bar = document.querySelector<HTMLElement>('.period-bar')
+    expect(
+      within(bar!).getByRole('heading', { level: 2, name: title }),
+    ).toBeInTheDocument()
+  })
 }
 
 /** Adds an entry to the shown day through the add row. */
@@ -221,7 +226,9 @@ async function deleteEntry(user: User, start: string) {
 }
 
 async function goTo(user: User, button: string, heading: string) {
-  await user.click(screen.getByRole('button', { name: button }))
+  const found = await screen.findByRole('button', { name: button })
+  await waitFor(() => expect(found).toBeEnabled())
+  await user.click(found)
   await screen.findByRole('heading', { name: heading })
 }
 
@@ -407,7 +414,7 @@ test('counts all days of the week as worked, also after the shown day, and no ot
   await goTo(user, 'Open Monday 23 November', 'Monday 23 November 2026')
   await waitForValue('Worked', '7:15')
 
-  await goTo(user, 'Previous day', 'Sunday 22 November 2026')
+  await goTo(user, 'Previous week', 'Friday 20 November 2026')
   await findPeriod('Week 47')
   await waitForValue('Worked', '8:00')
   await waitForValue('Balance in', '0:00')
@@ -554,16 +561,17 @@ test("shows the other week's values and carries a change there into the balance"
   await waitForValue('Balance in', '+6:00')
   await waitForValue('Worked', '1:00')
 
-  await goTo(user, 'Previous day', 'Sunday 22 November 2026')
+  await goTo(user, 'Previous week', 'Friday 20 November 2026')
   await findPeriod('Week 47')
   await waitForValue('Balance in', '+2:00')
   await waitForValue('Worked', '8:00')
 
+  await goTo(user, 'Open Sunday 22 November', 'Sunday 22 November 2026')
   await changeEnd(user, '09:00', '18:00')
   await waitForValue('Worked', '9:00')
   await waitForValue('Balance in', '+2:00')
 
-  await goTo(user, 'Next day', 'Monday 23 November 2026')
+  await goTo(user, 'Next week', 'Monday 23 November 2026')
   await findPeriod('Week 48')
   await waitForValue('Balance in', '+7:00')
   await waitForValue('Worked', '1:00')
@@ -621,10 +629,10 @@ test('a slow load of another week does not overwrite the values of the shown wee
   await waitForValue('Worked', '1:00')
 
   loads.holding = true
-  await goTo(user, 'Previous day', 'Sunday 22 November 2026')
+  await goTo(user, 'Previous week', 'Friday 20 November 2026')
   await waitFor(() => expect(loads.held).toBeGreaterThan(0))
   loads.holding = false
-  await goTo(user, 'Next day', 'Monday 23 November 2026')
+  await goTo(user, 'Next week', 'Monday 23 November 2026')
   await findPeriod('Week 48')
   await waitForValue('Worked', '1:00')
 
@@ -667,7 +675,7 @@ test('shows no metrics before the contract start', async () => {
   })
   await findMetric('Balance in')
 
-  await goTo(user, 'Previous day', 'Sunday 22 November 2026')
+  await goTo(user, 'Previous week', 'Friday 20 November 2026')
 
   await within(summaryRegion()).findByText('Before your contract starts')
   expect(summaryRegion().querySelector('.metric')).toBeNull()
@@ -703,11 +711,11 @@ async function typeExpected(user: User, text: string) {
   if (text !== '') await user.type(field, text)
 }
 
-/** Opens the page on Monday of week 48 and goes back to Sunday of week 47, which is past. */
+/** Opens the page on Monday of week 48 and goes back to week 47, which is past. */
 async function renderPastWeek(setup: Setup) {
   const { user } = await renderPage({ today: '2026-11-23', ...setup })
   await findPeriod('Week 48')
-  await goTo(user, 'Previous day', 'Sunday 22 November 2026')
+  await goTo(user, 'Previous week', 'Friday 20 November 2026')
   await findPeriod('Week 47')
   return { user }
 }
@@ -888,7 +896,7 @@ test('shows the balance after a past month', async () => {
   })
   await findMetric('Balance in')
 
-  await goTo(user, 'Previous day', 'Saturday 31 October 2026')
+  await goTo(user, 'Previous month', 'Friday 30 October 2026')
 
   await findPeriod('October 2026')
   await waitForMetric('Balance after', '-2:00', 'Hours still to work')
@@ -1014,7 +1022,7 @@ test('updates Balance after in a past week and carries it into the next week', a
   await waitForMetric('Balance after', '-2:00', 'Hours still to work')
   await waitForValue('Balance in', '0:00')
 
-  await goTo(user, 'Next day', 'Monday 23 November 2026')
+  await goTo(user, 'Next week', 'Monday 23 November 2026')
   await findPeriod('Week 48')
   await waitForValue('Balance in', '-2:00')
   await waitForMetric('Left', '–', NO_EXPECTED_NOTE)
@@ -1031,11 +1039,11 @@ test('keeps the right Left after saving Expected, going to another week and back
   await user.keyboard('{Enter}')
   await waitForMetric('Left', '20:00', 'Expected minus worked')
 
-  await goTo(user, 'Previous day', 'Sunday 22 November 2026')
+  await goTo(user, 'Previous week', 'Friday 20 November 2026')
   await findPeriod('Week 47')
   await waitForMetric('Balance after', '-6:00', 'Hours still to work')
 
-  await goTo(user, 'Next day', 'Monday 23 November 2026')
+  await goTo(user, 'Next week', 'Monday 23 November 2026')
   await findPeriod('Week 48')
   await waitForMetric('Left', '20:00', 'Expected minus worked')
 })

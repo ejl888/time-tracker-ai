@@ -21,17 +21,19 @@
   gap: 12px;
   flex-wrap: wrap;
 }
-.period-nav {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
 .period-title {
   font-family: var(--font-display);
   font-weight: 600;
   font-size: 20px;
   margin: 0;
   text-wrap: balance;
+}
+.period-sub {
+  color: var(--muted);
+  font-size: 13px;
+}
+.ptitle {
+  min-width: 0;
 }
 .spacer {
   flex: 1;

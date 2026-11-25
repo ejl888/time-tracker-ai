@@ -24,7 +24,6 @@ import {
   balanceInTitle,
   expectedNote,
   leftNote,
-  periodTitle,
   workedNote,
 } from './summaryMessages.ts'
 import type { LoadedSummary, SummaryServices } from './useSummary.ts'
@@ -42,8 +41,8 @@ interface PeriodSummaryProps extends SummaryServices {
 }
 
 /**
- * The summary bar above the days: the period with its balance, expected and worked hours,
- * and the hours left or the balance after it.
+ * The summary above the days: the balance, expected and worked hours of the period, and the
+ * hours left or the balance after it.
  */
 export function PeriodSummary({
   contracts,
@@ -86,7 +85,7 @@ function toneOf(balance: number): 'pos' | 'neg' | undefined {
   return balance > 0 ? 'pos' : 'neg'
 }
 
-/** The note before the contract start, else the period with its metrics. */
+/** The note before the contract start, else the metrics of the period. */
 function SummaryContent({
   contracts,
   contract,
@@ -114,13 +113,8 @@ function SummaryContent({
     worked.billable,
   )
   const isPast = Temporal.PlainDate.compare(period.end, today) < 0
-  const { title, sub } = periodTitle(period, contract.billingCycle)
   return (
     <>
-      <div className="ptitle">
-        <h2 className="period-name">{title}</h2>
-        <span className="period-sub">{sub}</span>
-      </div>
       <Metric
         name="Balance in"
         title={balanceInTitle(contract.billingCycle)}

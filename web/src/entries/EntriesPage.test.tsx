@@ -287,7 +287,7 @@ test('returns to today from an earlier day', async () => {
   ).toBeInTheDocument()
   await findEntries(1)
   expect(listedEntries()[0]).toMatchObject({ description: 'Today' })
-  expect(screen.getByRole('button', { name: 'Next day' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Next week' })).toBeDisabled()
 })
 
 test('warns when entries of the day overlap', async () => {
