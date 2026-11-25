@@ -46,6 +46,31 @@ export function balanceInNote(cycle: BillingCycle): string {
   return `From earlier ${cycle}s`
 }
 
+/** The note under Left: what it is the rest of, or by how much that is exceeded; `left` is then negative. */
+export function leftNote(
+  limit: number,
+  expected: number | undefined,
+  left: number,
+): string {
+  if (expected === undefined) return 'Enter expected hours first'
+  const capped = expected > limit
+  if (left < 0) {
+    return `${formatMinutes(-left)} more than ${capped ? 'the limit' : 'expected'}`
+  }
+  return capped ? 'Limit minus worked' : 'Expected minus worked'
+}
+
+/** The tooltip of Balance after. */
+export function balanceAfterTitle(cycle: BillingCycle): string {
+  return `Balance after ${cycle}`
+}
+
+/** The note under Balance after. */
+export function balanceAfterNote(balance: number): string {
+  if (balance === 0) return 'Nothing to carry over'
+  return balance > 0 ? 'Hours built up' : 'Hours still to work'
+}
+
 /** The note under Worked: the non-billable minutes that are not in it, if any. */
 export function workedNote(nonBillable: number): string {
   if (nonBillable === 0) return 'Billable labels only'

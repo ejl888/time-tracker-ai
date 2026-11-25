@@ -130,7 +130,7 @@ async function renderPage({
 }
 
 type User = ReturnType<typeof userEvent.setup>
-type MetricName = 'Balance in' | 'Worked'
+type MetricName = 'Balance in' | 'Worked' | 'Left' | 'Balance after'
 
 function summaryRegion() {
   return screen.getByRole('region', { name: 'Period summary' })
@@ -671,4 +671,392 @@ test('shows no metrics before the contract start', async () => {
 
   await within(summaryRegion()).findByText('Before your contract starts')
   expect(summaryRegion().querySelector('.metric')).toBeNull()
+})
+
+const NO_EXPECTED_NOTE = 'Enter expected hours first'
+
+/** Waits until a metric shows the value with the note. */
+async function waitForMetric(name: MetricName, value: string, note: string) {
+  // Fails with a clear message when the metric is missing.
+  await findMetric(name)
+  await waitFor(async () => {
+    const metric = await findMetric(name)
+    expect([metric.value.textContent, metric.note.textContent]).toEqual([
+      value,
+      note,
+    ])
+  })
+}
+
+/** The names of the shown metrics, in order. */
+function metricNames() {
+  return Array.from(
+    summaryRegion().querySelectorAll('.metric .k'),
+    (label) => label.textContent,
+  )
+}
+
+/** Replaces the text in the Expected field without leaving it; an empty text clears it. */
+async function typeExpected(user: User, text: string) {
+  const field = await findExpected()
+  await user.clear(field)
+  if (text !== '') await user.type(field, text)
+}
+
+/** Opens the page on Monday of week 48 and goes back to Sunday of week 47, which is past. */
+async function renderPastWeek(setup: Setup) {
+  const { user } = await renderPage({ today: '2026-11-23', ...setup })
+  await findPeriod('Week 48')
+  await goTo(user, 'Previous day', 'Sunday 22 November 2026')
+  await findPeriod('Week 47')
+  return { user }
+}
+
+test('shows Left as the last metric in the current week', async () => {
+  await renderPage({ contract: weekly })
+
+  await findMetric('Left')
+  expect(metricNames()).toEqual(['Balance in', 'Expected', 'Worked', 'Left'])
+})
+
+test('shows Balance after as the last metric in a past week', async () => {
+  await renderPastWeek({ contract: weekly })
+
+  await findMetric('Balance after')
+  expect(metricNames()).toEqual([
+    'Balance in',
+    'Expected',
+    'Worked',
+    'Balance after',
+  ])
+})
+
+test('asks for expected hours instead of showing the hours left', async () => {
+  await renderPage({ contract: weekly })
+
+  await waitForMetric('Left', '–', NO_EXPECTED_NOTE)
+})
+
+test('asks for expected hours also when hours were worked', async () => {
+  await renderPage({
+    contract: weekly,
+    entries: [['2026-11-25', '09:00', '17:00']],
+  })
+
+  await waitForMetric('Left', '–', NO_EXPECTED_NOTE)
+})
+
+// The limit is 8:00 and the hours are worked on Wednesday from 08:00.
+test.each([
+  ['nothing worked', 6 * 60, undefined, '6:00', 'Expected minus worked'],
+  ['some worked', 6 * 60, '09:30', '4:30', 'Expected minus worked'],
+  ['exactly all worked', 6 * 60, '14:00', '0:00', 'Expected minus worked'],
+  ['more worked', 6 * 60, '18:00', '0:00', '4:00 more than expected'],
+  ['zero expected', 0, undefined, '0:00', 'Expected minus worked'],
+  ['zero expected, worked', 0, '10:00', '0:00', '2:00 more than expected'],
+  ['the limit expected', 8 * 60, '10:00', '6:00', 'Expected minus worked'],
+  [
+    'the limit expected, more worked',
+    8 * 60,
+    '20:00',
+    '0:00',
+    '4:00 more than expected',
+  ],
+  ['capped, nothing worked', 10 * 60, undefined, '8:00', 'Limit minus worked'],
+  ['capped, some worked', 10 * 60, '10:00', '6:00', 'Limit minus worked'],
+  ['capped, all worked', 10 * 60, '16:00', '0:00', 'Limit minus worked'],
+  ['capped, more worked', 10 * 60, '20:00', '0:00', '4:00 more than the limit'],
+])(
+  'shows the hours left: %s',
+  async (_name, expected, workedUntil, value, note) => {
+    await renderPage({
+      contract: { ...weekly, billableLimit: 8 * 60 },
+      expected: { '2026-11-23': expected },
+      entries: workedUntil ? [['2026-11-25', '08:00', workedUntil]] : [],
+    })
+
+    await waitForMetric('Left', value, note)
+  },
+)
+
+test('does not count non-billable hours or the balance in for the hours left', async () => {
+  await renderPage({
+    contract: { ...weekly, startingBalance: 5 * 60 },
+    expected: { '2026-11-23': 10 * 60 },
+    entries: [
+      ['2026-11-25', '09:00', '11:00'],
+      ['2026-11-25', '13:00', '16:00', 'Admin'],
+    ],
+  })
+
+  await waitForMetric('Left', '8:00', 'Expected minus worked')
+})
+
+test('still shows Left on the last day of the week', async () => {
+  await renderPage({
+    today: '2026-11-29',
+    contract: weekly,
+    expected: { '2026-11-23': 8 * 60 },
+  })
+
+  await findPeriod('Week 48')
+  await waitForMetric('Left', '8:00', 'Expected minus worked')
+  expect(metricNames()).not.toContain('Balance after')
+})
+
+test('shows Left for an earlier day of the current week', async () => {
+  const { user } = await renderPage({
+    contract: weekly,
+    expected: { '2026-11-23': 8 * 60 },
+  })
+  await waitForMetric('Left', '8:00', 'Expected minus worked')
+
+  await goTo(user, 'Previous day', 'Tuesday 24 November 2026')
+
+  await waitForMetric('Left', '8:00', 'Expected minus worked')
+})
+
+test.each([
+  ['built up', 6 * 60, '+2:00', 'Hours built up', { pos: true, neg: false }],
+  [
+    'to work',
+    10 * 60,
+    '-2:00',
+    'Hours still to work',
+    { pos: false, neg: true },
+  ],
+  ['even', 8 * 60, '0:00', 'Nothing to carry over', { pos: false, neg: false }],
+])(
+  'shows the balance after a past week with its tone: %s',
+  async (_name, expected, text, note, classes) => {
+    await renderPastWeek({
+      contract: weekly,
+      expected: { '2026-11-16': expected },
+      entries: [['2026-11-18', '09:00', '17:00']],
+    })
+
+    await waitForMetric('Balance after', text, note)
+    const { label, value } = await findMetric('Balance after')
+    expect(label).toHaveAttribute('title', 'Balance after week')
+    expect(value.classList.contains('pos')).toBe(classes.pos)
+    expect(value.classList.contains('neg')).toBe(classes.neg)
+    expect(metricNames()).not.toContain('Left')
+  },
+)
+
+test('builds up everything worked in a past week without expected hours', async () => {
+  await renderPastWeek({
+    contract: weekly,
+    entries: [['2026-11-18', '09:00', '17:00']],
+  })
+
+  await waitForMetric('Balance after', '+8:00', 'Hours built up')
+})
+
+test('adds the balance in and bills up to the limit in the balance after', async () => {
+  await renderPastWeek({
+    contract: { ...weekly, billableLimit: 6 * 60, startingBalance: -60 },
+    expected: { '2026-11-16': 10 * 60 },
+    entries: [
+      ['2026-11-18', '09:00', '17:00'],
+      ['2026-11-18', '17:00', '18:00', 'Admin'],
+    ],
+  })
+
+  // -1:00 + 8:00 - 6:00
+  await waitForMetric('Balance after', '+1:00', 'Hours built up')
+})
+
+test('shows the hours left in the current month', async () => {
+  await renderPage({
+    today: '2026-11-30',
+    contract: monthly,
+    expected: { '2026-11-01': 140 * 60 },
+    entries: [['2026-11-02', '09:00', '17:00']],
+  })
+
+  await findPeriod('November 2026')
+  await waitForMetric('Left', '132:00', 'Expected minus worked')
+})
+
+test('shows the balance after a past month', async () => {
+  const { user } = await renderPage({
+    today: '2026-11-01',
+    contract: monthly,
+    expected: { '2026-10-01': 10 * 60 },
+    entries: [['2026-10-31', '09:00', '17:00']],
+  })
+  await findMetric('Balance in')
+
+  await goTo(user, 'Previous day', 'Saturday 31 October 2026')
+
+  await findPeriod('October 2026')
+  await waitForMetric('Balance after', '-2:00', 'Hours still to work')
+  expect((await findMetric('Balance after')).label).toHaveAttribute(
+    'title',
+    'Balance after month',
+  )
+})
+
+test.each([
+  ['Enter', (user: User) => user.keyboard('{Enter}')],
+  ['leaving the field', (user: User) => user.tab()],
+])('updates Left after saving Expected with %s', async (_name, save) => {
+  const { user } = await renderPage({
+    contract: weekly,
+    entries: [['2026-11-25', '09:00', '11:00']],
+  })
+  await waitForMetric('Left', '–', NO_EXPECTED_NOTE)
+
+  await typeExpected(user, '10')
+  await save(user)
+  await waitForMetric('Left', '8:00', 'Expected minus worked')
+
+  await typeExpected(user, '40')
+  await save(user)
+  await waitForMetric('Left', '34:00', 'Limit minus worked')
+})
+
+test('shows no hours left after clearing Expected', async () => {
+  const { user } = await renderPage({
+    contract: weekly,
+    expected: { '2026-11-23': 8 * 60 },
+  })
+  await waitForMetric('Left', '8:00', 'Expected minus worked')
+
+  await typeExpected(user, '')
+  await user.tab()
+
+  await waitForMetric('Left', '–', NO_EXPECTED_NOTE)
+})
+
+test('keeps Left when the Expected text is invalid', async () => {
+  const { user } = await renderPage({
+    contract: weekly,
+    expected: { '2026-11-23': 8 * 60 },
+  })
+  await waitForMetric('Left', '8:00', 'Expected minus worked')
+
+  await typeExpected(user, 'abc')
+  await user.keyboard('{Enter}')
+
+  await within(summaryRegion()).findByRole('alert')
+  await waitForMetric('Left', '8:00', 'Expected minus worked')
+})
+
+test('keeps Left while Expected is typed but not saved, and after Escape', async () => {
+  const { user } = await renderPage({
+    contract: weekly,
+    expected: { '2026-11-23': 8 * 60 },
+  })
+  await waitForMetric('Left', '8:00', 'Expected minus worked')
+
+  await typeExpected(user, '20')
+  await waitForMetric('Left', '8:00', 'Expected minus worked')
+
+  await user.keyboard('{Escape}')
+  expect(await findExpected()).toHaveValue('8:00')
+  await waitForMetric('Left', '8:00', 'Expected minus worked')
+
+  await user.tab()
+  await waitForMetric('Left', '8:00', 'Expected minus worked')
+})
+
+test('updates Left after adding an entry', async () => {
+  const { user } = await renderPage({
+    contract: weekly,
+    expected: { '2026-11-23': 8 * 60 },
+  })
+  await waitForMetric('Left', '8:00', 'Expected minus worked')
+
+  await addEntry(user, '09:00', '11:00')
+
+  await waitForMetric('Left', '6:00', 'Expected minus worked')
+})
+
+test('updates Left from the saved Expected after adding an entry', async () => {
+  const { user } = await renderPage({
+    contract: weekly,
+    expected: { '2026-11-23': 8 * 60 },
+  })
+  await waitForMetric('Left', '8:00', 'Expected minus worked')
+
+  await typeExpected(user, '20')
+  await user.keyboard('{Enter}')
+  await addEntry(user, '09:00', '11:00')
+
+  await waitForMetric('Left', '18:00', 'Expected minus worked')
+})
+
+test('keeps Balance in when Expected of the shown week is saved', async () => {
+  const { user } = await renderPage({
+    contract: { ...weekly, startingBalance: 60 },
+  })
+  await waitForMetric('Left', '–', NO_EXPECTED_NOTE)
+  await waitForValue('Balance in', '+1:00')
+
+  await typeExpected(user, '10')
+  await user.keyboard('{Enter}')
+
+  await waitForMetric('Left', '10:00', 'Expected minus worked')
+  await waitForValue('Balance in', '+1:00')
+})
+
+test('updates Balance after in a past week and carries it into the next week', async () => {
+  const { user } = await renderPastWeek({
+    contract: weekly,
+    entries: [['2026-11-18', '09:00', '17:00']],
+  })
+  await waitForMetric('Balance after', '+8:00', 'Hours built up')
+
+  await typeExpected(user, '10')
+  await user.keyboard('{Enter}')
+  await waitForMetric('Balance after', '-2:00', 'Hours still to work')
+  await waitForValue('Balance in', '0:00')
+
+  await goTo(user, 'Next day', 'Monday 23 November 2026')
+  await findPeriod('Week 48')
+  await waitForValue('Balance in', '-2:00')
+  await waitForMetric('Left', '–', NO_EXPECTED_NOTE)
+})
+
+test('keeps the right Left after saving Expected, going to another week and back', async () => {
+  const { user } = await renderPage({
+    today: '2026-11-23',
+    contract: weekly,
+    expected: { '2026-11-16': 6 * 60, '2026-11-23': 8 * 60 },
+  })
+  await waitForMetric('Left', '8:00', 'Expected minus worked')
+  await typeExpected(user, '20')
+  await user.keyboard('{Enter}')
+  await waitForMetric('Left', '20:00', 'Expected minus worked')
+
+  await goTo(user, 'Previous day', 'Sunday 22 November 2026')
+  await findPeriod('Week 47')
+  await waitForMetric('Balance after', '-6:00', 'Hours still to work')
+
+  await goTo(user, 'Next day', 'Monday 23 November 2026')
+  await findPeriod('Week 48')
+  await waitForMetric('Left', '20:00', 'Expected minus worked')
+})
+
+test('a load that was running when Expected was saved does not revert Left', async () => {
+  const loads = holdableLoads()
+  const { user } = await renderPage({
+    contract: weekly,
+    expected: { '2026-11-23': 8 * 60 },
+    prepare: loads.prepare,
+  })
+  await waitForMetric('Left', '8:00', 'Expected minus worked')
+
+  loads.holding = true
+  await addEntry(user, '09:00', '11:00')
+  await waitFor(() => expect(loads.held).toBeGreaterThan(0))
+  await typeExpected(user, '20')
+  await user.keyboard('{Enter}')
+  // The held load has not counted the new entry yet.
+  await waitForMetric('Left', '20:00', 'Expected minus worked')
+
+  await loads.release()
+  await waitForMetric('Left', '18:00', 'Expected minus worked')
 })
