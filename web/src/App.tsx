@@ -8,7 +8,7 @@ import { SettingsPage } from './settings/SettingsPage.tsx'
 type Screen = 'entries' | 'settings'
 
 const screens: { screen: Screen; title: string }[] = [
-  { screen: 'entries', title: 'Entries' },
+  { screen: 'entries', title: 'Overview' },
   { screen: 'settings', title: 'Settings' },
 ]
 

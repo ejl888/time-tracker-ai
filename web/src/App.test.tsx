@@ -54,14 +54,14 @@ test('stores labels in localStorage under timetracker.labels', async () => {
   ])
 })
 
-/** Switches to the entries screen with its tab button. */
-async function openEntries() {
+/** Switches to the overview screen with its tab button. */
+async function openOverview() {
   const user = userEvent.setup()
-  await user.click(screen.getByRole('button', { name: 'Entries' }))
+  await user.click(screen.getByRole('button', { name: 'Overview' }))
 }
 
 /**
- * Adds an entry for today through the add form of the entries screen.
+ * Adds an entry for today through the add form of the overview screen.
  * The entry is dated today, so it is never after today; only the date counts for that rule.
  */
 async function addEntry(label: string, description: string) {
@@ -82,10 +82,10 @@ async function addEntry(label: string, description: string) {
   await screen.findByRole('list', { name: 'Entries' })
 }
 
-test('opens on the entries screen', async () => {
+test('opens on the overview screen', async () => {
   render(<App />)
 
-  expect(screen.getByRole('button', { name: 'Entries' })).toHaveAttribute(
+  expect(screen.getByRole('button', { name: 'Overview' })).toHaveAttribute(
     'aria-pressed',
     'true',
   )
@@ -101,7 +101,7 @@ test('opens on the entries screen', async () => {
   ).not.toBeInTheDocument()
 })
 
-test('switches between the entries and settings screens', async () => {
+test('switches between the overview and settings screens', async () => {
   render(<App />)
 
   await openSettings()
@@ -110,7 +110,7 @@ test('switches between the entries and settings screens', async () => {
     'aria-pressed',
     'true',
   )
-  expect(screen.getByRole('button', { name: 'Entries' })).toHaveAttribute(
+  expect(screen.getByRole('button', { name: 'Overview' })).toHaveAttribute(
     'aria-pressed',
     'false',
   )
@@ -121,9 +121,9 @@ test('switches between the entries and settings screens', async () => {
     screen.queryByRole('form', { name: 'Add entry' }),
   ).not.toBeInTheDocument()
 
-  await openEntries()
+  await openOverview()
 
-  expect(screen.getByRole('button', { name: 'Entries' })).toHaveAttribute(
+  expect(screen.getByRole('button', { name: 'Overview' })).toHaveAttribute(
     'aria-pressed',
     'true',
   )
@@ -139,11 +139,36 @@ test('switches between the entries and settings screens', async () => {
   ).not.toBeInTheDocument()
 })
 
+test('the overview screen has one h1, an h2 for the period and an h3 for the open day, and no heading "Entries"', async () => {
+  render(<App />)
+  await screen.findByRole('heading', { level: 3 })
+
+  expect(
+    screen.queryByRole('heading', { name: 'Entries' }),
+  ).not.toBeInTheDocument()
+  const levels = screen
+    .getAllByRole('heading')
+    .map((heading) => heading.tagName)
+  expect(levels).toEqual(['H1', 'H2', 'H3'])
+  expect(
+    screen.getByRole('heading', { level: 1, name: 'Timetracker' }),
+  ).toBeInTheDocument()
+  expect(
+    screen.getByRole('heading', { level: 2, name: /^Week \d+$/ }),
+  ).toBeInTheDocument()
+  expect(
+    screen.getByRole('heading', {
+      level: 3,
+      name: /^\w+day \d{1,2} \w+ \d{4}$/,
+    }),
+  ).toBeInTheDocument()
+})
+
 test('keeps an added entry after a reload and stores it under timetracker.entries', async () => {
   const { unmount } = render(<App />)
   await openSettings()
   await addLabel('Client')
-  await openEntries()
+  await openOverview()
   await addEntry('Client', 'Review')
   unmount()
 
@@ -163,7 +188,7 @@ test('shows a label used by an entry as in use on the labels screen', async () =
   render(<App />)
   await openSettings()
   await addLabel('Client')
-  await openEntries()
+  await openOverview()
   await addEntry('Client', 'Review')
 
   await openSettings()
